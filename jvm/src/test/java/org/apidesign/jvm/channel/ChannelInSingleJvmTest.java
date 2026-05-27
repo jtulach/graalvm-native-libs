@@ -1,5 +1,12 @@
 package org.apidesign.jvm.channel;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.nio.ByteBuffer;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
@@ -21,7 +28,27 @@ public class ChannelInSingleJvmTest {
 
     @Override
     public Serde createPool(Channel<?> ignore) {
-      return null;
+      return new Serde() {
+          @Override
+          public byte[] write(Object obj) throws IOException {
+              var arr = new ByteArrayOutputStream();
+              try (var dos = new ObjectOutputStream(arr)) {
+                  dos.writeObject(obj);
+              }
+              return arr.toByteArray();
+          }
+
+          @Override
+          public Object read(ByteBuffer buf) throws IOException {
+              var arr = new byte[buf.remaining()];
+              buf.get(arr);
+              try (var dis = new ObjectInputStream(new ByteArrayInputStream(arr))) {
+                  return dis.readObject();
+              } catch (ClassNotFoundException ex) {
+                  throw new IOException(ex);
+              }
+          }
+      };
     }
   }
 
@@ -157,8 +184,7 @@ public class ChannelInSingleJvmTest {
     fail("STOP_METHOD_NAME field value should be consistent with method name");
   }
 
-  @Persistable(id = 8341)
-  static final class Increment implements Function<Channel<?>, Increment> {
+  static final class Increment implements Function<Channel<?>, Increment>, Serializable {
     int valueToIncrement;
 
     Increment(int valueToIncrement) {
@@ -177,9 +203,8 @@ public class ChannelInSingleJvmTest {
     }
   }
 
-  @Persistable(id = 8342)
   static record AssignPrivateData(int valueToSet)
-      implements Function<Channel<PrivateData>, AssignPrivateData> {
+      implements Function<Channel<PrivateData>, AssignPrivateData>, Serializable {
     @Override
     public AssignPrivateData apply(Channel<PrivateData> t) {
       t.getConfig().counter = valueToSet;
@@ -189,7 +214,7 @@ public class ChannelInSingleJvmTest {
 
   @Persistable(id = 8343)
   static record GenerateString(int lengthToGenerate)
-      implements Function<Channel<PrivateData>, LongString> {
+      implements Function<Channel<PrivateData>, LongString>, Serializable {
     @Override
     public LongString apply(Channel<PrivateData> t) {
       return handleGenerationOfStrings(lengthToGenerate);
@@ -203,15 +228,13 @@ public class ChannelInSingleJvmTest {
     }
   }
 
-  @Persistable(id = 8344)
-  static record LongString(String text) {
+  static record LongString(String text) implements Serializable {
     private LongString(int len) {
       this("Hello".repeat(len / 5) + "!!!!!".substring(5 - len % 5));
     }
   }
 
-  @Persistable(id = 8345)
-  record CountDownAndThrow(long value, long acc) implements Function<Channel<?>, Void> {
+  record CountDownAndThrow(long value, long acc) implements Function<Channel<?>, Void>, Serializable {
     @Override
     public Void apply(Channel<?> otherVM) {
       decrementAndSendMessage(value, acc, otherVM);

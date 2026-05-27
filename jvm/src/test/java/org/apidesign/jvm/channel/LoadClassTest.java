@@ -16,6 +16,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.graalvm.nativeimage.ImageInfo;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -23,8 +25,7 @@ public class LoadClassTest {
   private static final int MAX = 3000;
   private static final int MIN = 300;
   private static final String PATH = System.getProperty("java.home");
-  // set from TestCollectorFeature
-  public static String MODULE_PATH;
+  public static final String MODULE_PATH = System.getProperty("java.class.path");
 
   private static JVM impl;
 
@@ -36,7 +37,7 @@ public class LoadClassTest {
       impl =
           JVM.create(
               path,
-              "--module-path=" + MODULE_PATH,
+              "-cp=" + MODULE_PATH,
               "--enable-native-access=org.enso.os.environment",
               "-Djdk.module.main=org.enso.os.environment",
               "-Dsay=Ahoj");
@@ -48,6 +49,7 @@ public class LoadClassTest {
 
   @Before
   public void initializeChannel() throws Exception {
+    Assume.assumeTrue("Can only run in Native Image mode", ImageInfo.inImageCode());
     channel = Channel.create(jvm(), JVMPeer.class);
     assertTrue("Created channel is master", channel.isMaster());
   }
