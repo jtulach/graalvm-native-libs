@@ -7,17 +7,26 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.util.function.Function;
-import static org.junit.Assert.assertFalse;
+import org.graalvm.nativeimage.ImageInfo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class ChannelInSingleJvmTest {
+  @BeforeEach
+  public void onlyRunInHotSpot() {
+      Assumptions.assumeFalse(ImageInfo.inImageRuntimeCode(), "Cannot run Mock Channel tests in NI mode");
+  }
+
   public static final class PrivateData extends Channel.Config {
     static int countInstances;
     int counter;
@@ -55,15 +64,15 @@ public class ChannelInSingleJvmTest {
   @Test
   public void exchangeMessageThatModifiesItself() {
     var ch = Channel.create(null, PrivateData.class);
-    assertTrue("The created channel is a master", ch.isMaster());
+    assertTrue(ch.isMaster(), "The created channel is a master");
 
     var msg = new Increment(10);
 
     var newMsg = ch.execute(Increment.class, msg);
 
-    assertNotNull("Got a value", newMsg);
-    assertEquals("10 + 1", 11, newMsg.valueToIncrement());
-    assertEquals("Original value remains", 10, msg.valueToIncrement());
+    assertNotNull(newMsg, "Got a value");
+    assertEquals(11, newMsg.valueToIncrement(), "10 + 1");
+    assertEquals(10, msg.valueToIncrement(), "Original value remains");
   }
 
 
@@ -71,17 +80,17 @@ public class ChannelInSingleJvmTest {
   public void exchangeMessageThatModifiesPrivateData() {
     PrivateData.countInstances = 0;
     var ch = Channel.create(null, PrivateData.class);
-    assertEquals("Two channels & data created", 2, PrivateData.countInstances);
-    assertEquals("By default we are at zero", 0, ch.getConfig().counter);
+    assertEquals(2, PrivateData.countInstances, "Two channels & data created");
+    assertEquals(0, ch.getConfig().counter, "By default we are at zero");
 
     var msg = new AssignPrivateData(10);
     var newMsg = ch.execute(AssignPrivateData.class, msg);
 
-    assertEquals("PrivateData.counter hasn't been changed", 0, ch.getConfig().counter);
+    assertEquals(0, ch.getConfig().counter, "PrivateData.counter hasn't been changed");
 
-    assertNotNull("Got a value", newMsg);
-    assertEquals("10 + 1", 11, newMsg.valueToSet());
-    assertEquals("Original value remains", 10, msg.valueToSet());
+    assertNotNull(newMsg, "Got a value");
+    assertEquals(11, newMsg.valueToSet(), "10 + 1");
+    assertEquals(10, msg.valueToSet(), "Original value remains");
   }
 
   @Test
@@ -91,7 +100,7 @@ public class ChannelInSingleJvmTest {
     var msg = new GenerateString(256);
     var newMsg = ch.execute(LongString.class, msg);
 
-    assertEquals(newMsg.text(), 256, newMsg.text().length());
+    assertEquals(256, newMsg.text().length(), newMsg.text());
   }
 
   @Test
@@ -101,7 +110,7 @@ public class ChannelInSingleJvmTest {
     var msg = new GenerateString(32632);
     var newMsg = ch.execute(LongString.class, msg);
 
-    assertEquals(newMsg.text(), 32632, newMsg.text().length());
+    assertEquals(32632, newMsg.text().length(), newMsg.text());
   }
 
   @Test
@@ -156,17 +165,15 @@ public class ChannelInSingleJvmTest {
       for (var elem : ex.getStackTrace()) {
         if ("decrementAndSendMessage".equals(elem.getMethodName())) {
           assertEquals("ChannelInSingleJvmTest.java", elem.getFileName());
-          assertNotEquals(-1, elem.getLineNumber());
+          assertNotEquals(elem.getLineNumber(), -1);
           assertEquals(action.getClass().getName(), elem.getClassName());
           countDecrementAndSendMessage++;
         }
       }
       if (action.value() != countDecrementAndSendMessage) {
         ex.printStackTrace();
-        assertEquals(
-            "There is exactly right amount of invocations",
-            action.value(),
-            countDecrementAndSendMessage);
+        assertEquals(            action.value(),
+            countDecrementAndSendMessage, "There is exactly right amount of invocations");
       }
     }
   }
@@ -198,7 +205,7 @@ public class ChannelInSingleJvmTest {
     @Override
     public Increment apply(Channel<?> channel) {
       valueToIncrement++;
-      assertFalse("We are processed in the slave", channel.isMaster());
+      assertFalse(channel.isMaster(), "We are processed in the slave");
       return this;
     }
   }
