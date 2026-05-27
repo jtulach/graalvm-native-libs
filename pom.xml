@@ -79,13 +79,28 @@
                                 <goal>compile-no-fork</goal>
                             </goals>
                             <phase>package</phase>
+                            <configuration>
+                                <sharedLibrary>true</sharedLibrary>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>test-native</id>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                            <phase>test</phase>
+                            <configuration>
+                                <buildArgs>
+                                    <arg>-ea</arg>
+                                </buildArgs>
+                                <debug>true</debug>
+                            </configuration>
                         </execution>
                     </executions>
                     <configuration>
                         <metadataRepository>
                             <enabled>false</enabled>
                         </metadataRepository>
-                        <sharedLibrary>true</sharedLibrary>
                     </configuration>
                 </plugin>
             </plugins>
