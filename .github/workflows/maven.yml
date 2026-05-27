@@ -19,5 +19,8 @@ jobs:
         java-version: '25'
         distribution: 'graalvm'
         cache: maven
-    - name: Build with Maven
+    - name: Build
       run: mvn -B package --file pom.xml
+
+    - name: Build Native
+      run: mvn -Pnative -B package --file pom.xml
