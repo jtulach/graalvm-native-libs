@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class JVMPeer extends Channel.Config {
-
-  public JVMPeer() {}
+  public JVMPeer() {
+  }
 
   @Override
   public Serde createPool(Channel<?> ignore) {
