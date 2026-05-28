@@ -24,9 +24,9 @@ public final class LoadJvmTest {
         var out = File.createTempFile("check-main", ".log");
         for (var i = 0; i < 5; i++) {
             var n = 10 + i;
-            TestUtils.jvm().executeMain("org/apidesign/jvm/channel/TestMain", out.getPath(), "" + n);
+            TestUtils.jvm().executeMain("org/apidesign/jvm/channel/ChannelFactorialTest", out.getPath(), "" + n);
             var content = Files.readString(out.toPath());
-            assertEquals(TestMain.factorial(n).toString(), content, "Factorial of " + n + " is the same");
+            assertEquals(ChannelFactorialTest.factorial(n).toString(), content, "Factorial of " + n + " is the same");
             out.delete();
         }
     }

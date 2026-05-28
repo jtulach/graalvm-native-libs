@@ -3,22 +3,34 @@ package org.apidesign.jvm.channel;
 import java.io.File;
 import java.net.URISyntaxException;
 import org.graalvm.nativeimage.ImageInfo;
+import org.junit.jupiter.api.Assertions;
 
 final class TestUtils {
     private TestUtils() {
     }
 
     private static final String PATH = System.getProperty("java.home");
-    private static final String CLASS_PATH;
+    private static final String CLASS_PATH = pathForClasses(
+        Channel.class,
+        TestUtils.class,
+        Assertions.class
+    );
 
-    static {
-        try {
-            var u1 = Channel.class.getProtectionDomain().getCodeSource().getLocation();
-            var u2 = TestUtils.class.getProtectionDomain().getCodeSource().getLocation();
-            CLASS_PATH = new File(u1.toURI()).getPath() + File.pathSeparator + new File(u2.toURI()).getPath();
-        } catch (URISyntaxException ex) {
-            throw new AssertionError(ex);
+    private static String pathForClasses(Class<?>... classes) {
+        var sb = new StringBuilder();
+        var sep = "";
+        for (var c : classes) {
+            try {
+                var url = c.getProtectionDomain().getCodeSource().getLocation();
+                var file = new File(url.toURI()).getPath();
+                sb.append(sep);
+                sb.append(file);
+                sep = File.pathSeparator;
+            } catch (URISyntaxException ex) {
+                throw new AssertionError(ex);
+            }
         }
+        return sb.toString();
     }
 
     private static JVM impl;

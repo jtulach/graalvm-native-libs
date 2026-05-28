@@ -24,62 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class LoadClassTest {
-  private static final int MAX = 3000;
-  private static final int MIN = 300;
 
-  @Test
-  public void computeFactorialViaMessages() throws Exception {
-    TestMain.CORRECT_RESULTS.clear();
-    assertEquals(0, TestMain.CORRECT_RESULTS.size(), "Results are empty");
-    var gen = new Random();
-    var n = 0L;
-    for (var i = 0; i < 5; i++) {
-      n += gen.nextLong(MIN, MAX);
-      channel.execute(Void.class, new TestMain.RequestFactorial(n));
-    }
-    assertEquals(5, TestMain.CORRECT_RESULTS.size(), "Five results found: " + TestMain.CORRECT_RESULTS);
-    for (var e : TestMain.CORRECT_RESULTS.entrySet()) {
-      var expecting = TestMain.factorial(e.getKey());
-      assertEquals(expecting.toString(), e.getValue(), "fac(" + e.getKey() + ") should be");
-    }
-  }
-
-  @Test
-  public void computeFactorialViaSingleMessage() throws Exception {
-    var gen = new Random();
-    var n = 0L;
-    for (var i = 0; i < 5; i++) {
-      n += gen.nextLong(MIN, MAX);
-      var res = channel.execute(BigInteger.class, new TestMain.ComputeFactorial(n));
-      var expecting = TestMain.factorial(n);
-      assertEquals(expecting, res, "fac(" + n + ") should be");
-    }
-  }
-
-  @Test
-  public void throwFactorialOne() throws Exception {
-    assertException("1", new TestMain.CountDownAndThrow(1, 1));
-  }
-
-  @Test
-  public void throwFactorialTwo() throws Exception {
-    assertException("2", new TestMain.CountDownAndThrow(2, 1));
-  }
-
-  @Test
-  public void throwFactorialThree() throws Exception {
-    assertException("6", new TestMain.CountDownAndThrow(3, 1));
-  }
-
-  @Test
-  public void throwFactorialFour() throws Exception {
-    assertException("24", new TestMain.CountDownAndThrow(4, 1));
-  }
-
-  @Test
-  public void throwFactorialFive() throws Exception {
-    assertException("120", new TestMain.CountDownAndThrow(5, 1));
-  }
 /*
   @Test
   public void loadFromDynamicLibrary() throws Exception {
@@ -108,25 +53,4 @@ public class LoadClassTest {
   }
 */
 
-  private void assertException(String msg, TestMain.CountDownAndThrow action) {
-    try {
-      channel.execute(Void.class, action);
-      fail("Expecting an exception to be thrown for " + msg);
-    } catch (IllegalStateException ex) {
-      assertEquals(msg, ex.getMessage());
-      var countDecrementAndSendMessage = 0;
-      for (var elem : ex.getStackTrace()) {
-        if ("decrementAndSendMessage".equals(elem.getMethodName())) {
-          assertEquals("TestMain.java", elem.getFileName());
-          assertNotEquals(-1, elem.getLineNumber());
-          assertEquals(action.getClass().getName(), elem.getClassName());
-          countDecrementAndSendMessage++;
-        }
-      }
-      if (action.value() != countDecrementAndSendMessage) {
-        ex.printStackTrace();
-        assertEquals(action.value(), countDecrementAndSendMessage, "There is exactly right amount of invocations");
-      }
-    }
-  }
 }
