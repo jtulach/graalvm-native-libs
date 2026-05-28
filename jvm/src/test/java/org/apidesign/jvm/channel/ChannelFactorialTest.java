@@ -134,6 +134,7 @@ final class ChannelFactorialTest {
                     case ReportResult v -> {
                         dos.writeByte(3);
                         dos.writeLong(v.key());
+                        dos.writeInt(v.value().length());
                         dos.writeChars(v.value());
                     }
                     case BigInteger v -> {
@@ -163,7 +164,8 @@ final class ChannelFactorialTest {
                     new ComputeFactorial(buf.getLong());
                 case 3 -> {
                     var key = buf.getLong();
-                    var str = buf.asCharBuffer().toString();
+                    var len = buf.getInt();
+                    var str = buf.asCharBuffer().toString().substring(0, len);
                     yield new ReportResult(key, str);
                 }
                 case 11 -> {
