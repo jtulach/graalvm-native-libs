@@ -9,56 +9,61 @@ import org.graalvm.nativeimage.c.type.CCharPointer;
 import org.graalvm.nativeimage.c.type.WordPointer;
 import org.graalvm.word.PointerBase;
 
-/** Java virtual machine initialization API. */
+/**
+ * Java virtual machine initialization API.
+ */
 @CContext(JNIDirectives.class)
 final class JNIBoot {
-  interface JNICreateJavaVMPointer extends CFunctionPointer {
-    @InvokeCFunctionPointer
-    int call(JNI.JavaVMPointer jvmptr, JNI.JNIEnvPointer env, Args args);
-  }
 
-  @CStruct("JavaVMInitArgs")
-  interface Args extends PointerBase {
-    @CField
-    int version();
+    interface JNICreateJavaVMPointer extends CFunctionPointer {
 
-    @CField
-    void version(int v);
+        @InvokeCFunctionPointer
+        int call(JNI.JavaVMPointer jvmptr, JNI.JNIEnvPointer env, Args args);
+    }
 
-    @CField
-    int nOptions();
+    @CStruct("JavaVMInitArgs")
+    interface Args extends PointerBase {
 
-    @CField
-    void nOptions(int n);
+        @CField
+        int version();
 
-    @CField
-    Option options();
+        @CField
+        void version(int v);
 
-    @CField
-    void options(Option ptr);
+        @CField
+        int nOptions();
 
-    @CField
-    boolean ignoreUnrecognized();
+        @CField
+        void nOptions(int n);
 
-    @CField
-    void ignoreUnrecognized(boolean v);
-  }
+        @CField
+        Option options();
 
-  @CStruct(value = "JavaVMOption")
-  interface Option extends PointerBase {
+        @CField
+        void options(Option ptr);
 
-    @CField("optionString")
-    CCharPointer getOptionString();
+        @CField
+        boolean ignoreUnrecognized();
 
-    @CField("optionString")
-    void setOptionString(CCharPointer value);
+        @CField
+        void ignoreUnrecognized(boolean v);
+    }
 
-    @CField("extraInfo")
-    WordPointer getExtraInfo();
+    @CStruct(value = "JavaVMOption")
+    interface Option extends PointerBase {
 
-    @CField("extraInfo")
-    void setExtraInfo(WordPointer value);
+        @CField("optionString")
+        CCharPointer getOptionString();
 
-    Option addressOf(int index);
-  }
+        @CField("optionString")
+        void setOptionString(CCharPointer value);
+
+        @CField("extraInfo")
+        WordPointer getExtraInfo();
+
+        @CField("extraInfo")
+        void setExtraInfo(WordPointer value);
+
+        Option addressOf(int index);
+    }
 }

@@ -182,15 +182,24 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         }
         var e = jvm.env();
         var classNameWithSlashes = Channel.class.getName().replace('.', '/');
-        try (var classInC = CTypeConversion.toCString(classNameWithSlashes); var poolClassInC = CTypeConversion.toCString(configClass.getName()); var createInC = CTypeConversion.toCString("createJvmPeerChannel"); var createSigInC = CTypeConversion.toCString("(JJJLjava/lang/String;)Z"); //
-                 var handleInC = CTypeConversion.toCString("handleJvmMessage"); var handleSigInC = CTypeConversion.toCString("(JJJJ)J"); //
-                ) {
+        try (
+            var classInC = CTypeConversion.toCString(classNameWithSlashes);
+            var poolClassInC = CTypeConversion.toCString(configClass.getName());
+            var createInC = CTypeConversion.toCString("createJvmPeerChannel");
+            var createSigInC = CTypeConversion.toCString("(JJJLjava/lang/String;)Z");
+            var handleInC = CTypeConversion.toCString("handleJvmMessage");
+            var handleSigInC = CTypeConversion.toCString("(JJJJ)J");
+        ) {
             var fn = e.getFunctions();
             var channelClass = fn.getFindClass().call(e, classInC.get());
-            assert channelClass.isNonNull() : "Class not found " + classNameWithSlashes;
+            if (channelClass.isNull()) {
+                throw new IllegalStateException("Class not found " + classNameWithSlashes);
+            }
             var createMethod
                     = fn.getGetStaticMethodID().call(e, channelClass, createInC.get(), createSigInC.get());
-            assert createMethod.isNonNull() : "method not found in " + classNameWithSlashes;
+            if (createMethod.isNull()) {
+                throw new IllegalStateException("method not found in " + classNameWithSlashes);
+            }
             var poolClassInHotSpot = fn.getNewStringUTF().call(e, poolClassInC.get());
             var handleMethod
                     = fn.getGetStaticMethodID().call(e, channelClass, handleInC.get(), handleSigInC.get());

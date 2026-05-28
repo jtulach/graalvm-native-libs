@@ -13,14 +13,16 @@ final class TestUtils {
 
     static {
         try {
-            var url = TestUtils.class.getProtectionDomain().getCodeSource().getLocation();
-            CLASS_PATH = new File(url.toURI()).getPath();
+            var u1 = Channel.class.getProtectionDomain().getCodeSource().getLocation();
+            var u2 = TestUtils.class.getProtectionDomain().getCodeSource().getLocation();
+            CLASS_PATH = new File(u1.toURI()).getPath() + File.pathSeparator + new File(u2.toURI()).getPath();
         } catch (URISyntaxException ex) {
             throw new AssertionError(ex);
         }
     }
 
     private static JVM impl;
+
     static JVM jvm() {
         if (impl == null) {
             assert ImageInfo.inImageRuntimeCode();
