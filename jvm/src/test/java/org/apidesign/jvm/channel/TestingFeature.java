@@ -7,9 +7,11 @@ import org.graalvm.nativeimage.hosted.RuntimeSerialization;
 public final class TestingFeature implements Feature {
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
-        var jvmPeerClass = access.findClassByName("org.apidesign.jvm.channel.JVMPeer");
-        RuntimeReflection.register(jvmPeerClass);
-        RuntimeReflection.register(jvmPeerClass.getConstructors());
+        RuntimeReflection.register(JVMPeer.class);
+        RuntimeReflection.register(JVMPeer.class.getConstructors());
+
+        RuntimeReflection.register(ChannelCountReturnTest.Conf.class);
+        RuntimeReflection.register(ChannelCountReturnTest.Conf.class.getConstructors());
 
         for (var clazz : ChannelMockInSingleJvmTest.class.getNestMembers()) {
             RuntimeSerialization.registerIncludingAssociatedClasses(clazz);

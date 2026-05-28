@@ -1,57 +1,20 @@
 package org.apidesign.jvm.channel;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class JVMPeer extends Channel.Config implements Serde {
+public final class JVMPeer extends Channel.Config {
 
     public JVMPeer() {
     }
 
     @Override
     public Serde createPool(Channel<?> ignore) {
-        return this;
+        return null;
     }
 
-    @Override
-    public byte[] write(Object obj) throws IOException {
-        var bos = new ByteArrayOutputStream();
-        try (var dos = new DataOutputStream(bos)) {
-            switch (obj) {
-                case Long v -> {
-                    dos.writeByte(1);
-                    dos.writeLong(v);
-                }
-                case TestMain.CountDownAndReturn v -> {
-                    dos.writeByte(11);
-                    dos.writeLong(v.value());
-                    dos.writeLong(v.acc());
-                }
-                case null -> throw new IOException("null");
-                default -> throw new IOException("" + obj + " type: " + obj.getClass());
-            }
-        }
-        return bos.toByteArray();
-    }
-
-    @Override
-    public Object read(ByteBuffer buf) throws IOException {
-        var type = buf.get();
-        return switch (type) {
-            case 1 -> buf.getLong();
-            case 11 -> {
-                var value = buf.getLong();
-                var acc = buf.getLong();
-                yield new TestMain.CountDownAndReturn(value, acc);
-            }
-            default -> throw new IOException("Type: " + type);
-        };
-    }
 
     @Persistable(id = 432002)
     static final class PersistList extends Persistance<List> {

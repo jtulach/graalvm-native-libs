@@ -23,6 +23,11 @@ final class TestUtils {
 
     private static JVM impl;
 
+    /**
+     * Creates an instance of {@link JVM} to perform some tests with it. Please
+     * note: <strong>there can be only one HotSpot JVM</strong> per process. Always
+     * use this method in tests. Avoid creating another JVMs directly.
+     */
     static JVM jvm() {
         if (impl == null) {
             assert ImageInfo.inImageRuntimeCode();

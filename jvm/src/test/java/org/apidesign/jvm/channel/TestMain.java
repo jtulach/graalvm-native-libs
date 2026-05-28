@@ -67,18 +67,6 @@ final class TestMain {
         }
     }
 
-    @Persistable(id = 430609)
-    record CountDownAndReturn(long value, long acc) implements Function<Channel<?>, Long> {
-
-        @Override
-        public Long apply(Channel<?> otherVM) {
-            if (value <= 1) {
-                return acc;
-            } else {
-                return otherVM.execute(Long.class, new CountDownAndReturn(value - 1, acc * value));
-            }
-        }
-    }
 
     @Persistable(id = 430610)
     record CountDownAndThrow(long value, long acc) implements Function<Channel<?>, Void> {

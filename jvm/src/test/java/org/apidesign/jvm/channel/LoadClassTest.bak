@@ -27,19 +27,6 @@ public class LoadClassTest {
   private static final int MAX = 3000;
   private static final int MIN = 300;
 
-  private static JVM impl;
-
-  private static JVM jvm() {
-    if (impl == null) {
-      assert TestUtils.CLASS_PATH != null : "CLASS_PATH field must be set!";
-      var path = new File(TestUtils.PATH);
-      assert path.isDirectory() : "Java home exists: " + path;
-      impl = JVM.create(path, "-Djava.class.path=" + TestUtils.CLASS_PATH);
-    }
-    return impl;
-  }
-
-
   @Test
   public void computeFactorialViaMessages() throws Exception {
     TestMain.CORRECT_RESULTS.clear();
@@ -67,75 +54,6 @@ public class LoadClassTest {
       var expecting = TestMain.factorial(n);
       assertEquals(expecting, res, "fac(" + n + ") should be");
     }
-  }
-
-  @Test
-  public void backAndForthFactorialOne() throws Exception {
-    var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(1, 1));
-    assertEquals(1, fac.longValue());
-  }
-
-  @Test
-  public void backAndForthFactorialTwo() throws Exception {
-    var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(2, 1));
-    assertEquals(2, fac.longValue());
-  }
-
-  @Test
-  public void backAndForthFactorialThree() throws Exception {
-    var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(3, 1));
-    assertEquals(6, fac.longValue());
-  }
-
-  @Test
-  public void backAndForthFactorialFour() throws Exception {
-    var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(4, 1));
-    assertEquals(24, fac.longValue());
-  }
-
-  @Test
-  public void factorialInSecondThread() throws Exception {
-    var pool = Executors.newSingleThreadExecutor();
-    var v =
-        pool.submit(
-            () -> {
-              var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(5, 1));
-              return fac;
-            });
-    assertEquals(120, v.get().longValue());
-    pool.shutdown();
-    pool.awaitTermination(10, TimeUnit.SECONDS);
-  }
-
-  @Test
-  public void factorialInManyThreads() throws Exception {
-    var pool = Executors.newFixedThreadPool(30);
-    executeInParallel(1000, pool);
-  }
-
-  private void executeInParallel(int count, ExecutorService pool)
-      throws ExecutionException, InterruptedException {
-    var futures = new ArrayList<Future<Long>>();
-    for (int i = 0; i < count; i++) {
-      var v =
-          pool.submit(
-              () -> {
-                var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(5, 1));
-                return fac;
-              });
-      futures.add(v);
-    }
-    for (var v : futures) {
-      assertEquals(120, v.get().longValue());
-    }
-    pool.shutdown();
-    pool.awaitTermination(10, TimeUnit.SECONDS);
-  }
-
-  @Test
-  public void backAndForthFactorialFive() throws Exception {
-    var fac = channel.execute(Long.class, new TestMain.CountDownAndReturn(5, 1));
-    assertEquals(120, fac.longValue());
   }
 
   @Test
