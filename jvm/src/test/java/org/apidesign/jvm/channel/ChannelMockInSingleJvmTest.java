@@ -21,44 +21,9 @@ import org.junit.jupiter.api.Test;
 
 public class ChannelMockInSingleJvmTest {
 
-    public static final class PrivateData extends Channel.Config {
-
-        static int countInstances;
-        int counter;
-
-        public PrivateData() {
-            countInstances++;
-        }
-
-        @Override
-        public Serde createPool(Channel<?> ignore) {
-            return new Serde() {
-                @Override
-                public byte[] write(Object obj) throws IOException {
-                    var arr = new ByteArrayOutputStream();
-                    try (var dos = new ObjectOutputStream(arr)) {
-                        dos.writeObject(obj);
-                    }
-                    return arr.toByteArray();
-                }
-
-                @Override
-                public Object read(ByteBuffer buf) throws IOException {
-                    var arr = new byte[buf.remaining()];
-                    buf.get(arr);
-                    try (var dis = new ObjectInputStream(new ByteArrayInputStream(arr))) {
-                        return dis.readObject();
-                    } catch (ClassNotFoundException ex) {
-                        throw new IOException(ex);
-                    }
-                }
-            };
-        }
-    }
-
     @Test
     public void exchangeMessageThatModifiesItself() {
-        var ch = Channel.create(null, PrivateData.class);
+        var ch = Channel.create(null, Conf.class);
         assertTrue(ch.isMaster(), "The created channel is a master");
 
         var msg = new Increment(10);
@@ -72,9 +37,9 @@ public class ChannelMockInSingleJvmTest {
 
     @Test
     public void exchangeMessageThatModifiesPrivateData() {
-        PrivateData.countInstances = 0;
-        var ch = Channel.create(null, PrivateData.class);
-        assertEquals(2, PrivateData.countInstances, "Two channels & data created");
+        Conf.countInstances = 0;
+        var ch = Channel.create(null, Conf.class);
+        assertEquals(2, Conf.countInstances, "Two channels & data created");
         assertEquals(0, ch.getConfig().counter, "By default we are at zero");
 
         var msg = new AssignPrivateData(10);
@@ -89,7 +54,7 @@ public class ChannelMockInSingleJvmTest {
 
     @Test
     public void smallText() {
-        var ch = Channel.create(null, PrivateData.class);
+        var ch = Channel.create(null, Conf.class);
 
         var msg = new GenerateString(256);
         var newMsg = ch.execute(LongString.class, msg);
@@ -99,7 +64,7 @@ public class ChannelMockInSingleJvmTest {
 
     @Test
     public void longText() {
-        var ch = Channel.create(null, PrivateData.class);
+        var ch = Channel.create(null, Conf.class);
 
         var msg = new GenerateString(32632);
         var newMsg = ch.execute(LongString.class, msg);
@@ -109,7 +74,7 @@ public class ChannelMockInSingleJvmTest {
 
     @Test
     public void exceptionIsThrows() {
-        var ch = Channel.create(null, PrivateData.class);
+        var ch = Channel.create(null, Conf.class);
 
         var msg = new GenerateString(-73);
         try {
@@ -149,7 +114,7 @@ public class ChannelMockInSingleJvmTest {
     }
 
     private void assertException(String msg, CountDownAndThrow action) {
-        var channel = Channel.create(null, PrivateData.class);
+        var channel = Channel.create(null, Conf.class);
         try {
             channel.execute(Void.class, action);
             fail("Expecting an exception to be thrown for " + msg);
@@ -210,21 +175,20 @@ public class ChannelMockInSingleJvmTest {
     }
 
     static record AssignPrivateData(int valueToSet)
-            implements Function<Channel<PrivateData>, AssignPrivateData>, Serializable {
+            implements Function<Channel<Conf>, AssignPrivateData>, Serializable {
 
         @Override
-        public AssignPrivateData apply(Channel<PrivateData> t) {
+        public AssignPrivateData apply(Channel<Conf> t) {
             t.getConfig().counter = valueToSet;
             return new AssignPrivateData(t.getConfig().counter + 1);
         }
     }
 
-    @Persistable(id = 8343)
     static record GenerateString(int lengthToGenerate)
-            implements Function<Channel<PrivateData>, LongString>, Serializable {
+            implements Function<Channel<Conf>, LongString>, Serializable {
 
         @Override
-        public LongString apply(Channel<PrivateData> t) {
+        public LongString apply(Channel<Conf> t) {
             return handleGenerationOfStrings(lengthToGenerate);
         }
 
@@ -256,6 +220,43 @@ public class ChannelMockInSingleJvmTest {
                 throw new IllegalStateException("" + sum);
             } else {
                 otherVM.execute(Void.class, new CountDownAndThrow(n - 1, sum * n));
+            }
+        }
+    }
+
+    /** Example of a channel configuration that is using {@link ObjectInputStream}
+     * and {@link ObjectOutputStream} to transfer messages over the {@link Channel}.
+     */
+    public static final class Conf extends Channel.Config implements Serde {
+        static int countInstances;
+        int counter;
+
+        public Conf() {
+            countInstances++;
+        }
+
+        @Override
+        public Serde createPool(Channel<?> ignore) {
+            return this;
+        }
+
+        @Override
+        public byte[] write(Object obj) throws IOException {
+            var arr = new ByteArrayOutputStream();
+            try (var dos = new ObjectOutputStream(arr)) {
+                dos.writeObject(obj);
+            }
+            return arr.toByteArray();
+        }
+
+        @Override
+        public Object read(ByteBuffer buf) throws IOException {
+            var arr = new byte[buf.remaining()];
+            buf.get(arr);
+            try (var dis = new ObjectInputStream(new ByteArrayInputStream(arr))) {
+                return dis.readObject();
+            } catch (ClassNotFoundException ex) {
+                throw new IOException(ex);
             }
         }
     }
