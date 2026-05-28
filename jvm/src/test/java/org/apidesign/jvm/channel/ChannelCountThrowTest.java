@@ -5,11 +5,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
-import org.graalvm.nativeimage.ImageInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.fail;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +17,6 @@ public class ChannelCountThrowTest {
 
     @BeforeEach
     public void initializeChannel() throws Exception {
-        Assumptions.assumeTrue(ImageInfo.inImageCode(), "Can only run in Native Image mode");
         channel = Channel.create(TestUtils.jvm(), Conf.class);
     }
 

@@ -11,9 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import org.graalvm.nativeimage.ImageInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +21,6 @@ public class ChannelCountReturnTest {
 
     @BeforeEach
     public void initializeChannel() throws Exception {
-        Assumptions.assumeTrue(ImageInfo.inImageCode(), "Can only run in Native Image mode");
         channel = Channel.create(TestUtils.jvm(), Conf.class);
     }
 

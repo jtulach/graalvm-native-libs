@@ -11,10 +11,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.function.Function;
-import org.graalvm.nativeimage.ImageInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +26,6 @@ final class ChannelFactorialTest {
 
     @BeforeEach
     public void initializeChannel() throws Exception {
-        Assumptions.assumeTrue(ImageInfo.inImageCode(), "Can only run in Native Image mode");
         channel = Channel.create(TestUtils.jvm(), Conf.class);
     }
 
@@ -105,7 +102,11 @@ final class ChannelFactorialTest {
         @Override
         public Void apply(Channel otherVM) {
             var vm = System.getProperty("java.vm.name");
-            assertEquals("Substrate VM", vm, "Running in SVM again!");
+            if (otherVM.isDualJvmMode()) {
+                assertEquals("Substrate VM", vm, "Running in SVM again!");
+            } else {
+                // running in OpenJDK mock mode
+            }
             CORRECT_RESULTS.put(key, value);
             return null;
         }

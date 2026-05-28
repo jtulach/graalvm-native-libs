@@ -39,10 +39,12 @@ final class TestUtils {
      * Creates an instance of {@link JVM} to perform some tests with it. Please
      * note: <strong>there can be only one HotSpot JVM</strong> per process. Always
      * use this method in tests. Avoid creating another JVMs directly.
+     *
+     * @return singleton JVM when in native image mode or {@code null}
+     *    when in HotSpot mode
      */
     static JVM jvm() {
-        if (impl == null) {
-            assert ImageInfo.inImageRuntimeCode();
+        if (impl == null && ImageInfo.inImageRuntimeCode()) {
             assert CLASS_PATH != null : "CLASS_PATH field must be set!";
             var path = new File(PATH);
             assert path.isDirectory() : "Java home exists: " + path;
