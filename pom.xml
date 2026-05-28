@@ -92,6 +92,20 @@
                             <configuration>
                                 <buildArgs>
                                     <arg>-ea</arg>
+                                    <!--
+                                    To debug tests in Native Mode:
+                                    - JAVA_HOME=~/graalvm-25/ mvn -Pnative clean install
+                                    - edit ./jvm/target/test-ids/junit-platform-unique-ids*.txt to select the right test
+                                    ```
+                                    JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,address=8000 \
+                                    `pwd`/jvm/target/native-tests \
+                                    -XX:JDWPOptions=transport=dt_socket,server=y,address=8000 \
+                                    -Djunit.platform.listeners.uid.tracking.output.dir=./jvm/target/test-ids
+                                    ```
+                                    - and then connect twice(!) to the debugging awaiting at port 8000
+                                    -->
+                                    <arg>-H:+UnlockExperimentalVMOptions</arg>
+                                    <arg>-H:+JDWP</arg>
                                 </buildArgs>
                                 <debug>true</debug>
                             </configuration>
