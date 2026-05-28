@@ -227,17 +227,12 @@ public class ChannelMockInSingleJvmTest {
     /** Example of a channel configuration that is using {@link ObjectInputStream}
      * and {@link ObjectOutputStream} to transfer messages over the {@link Channel}.
      */
-    public static final class Conf extends Channel.Config implements Serde {
+    public static final class Conf extends Channel.Config {
         static int countInstances;
         int counter;
 
         public Conf() {
             countInstances++;
-        }
-
-        @Override
-        public Serde createPool(Channel<?> ignore) {
-            return this;
         }
 
         @Override

@@ -1,5 +1,7 @@
 package org.apidesign.jvm.channel;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -29,8 +31,8 @@ import org.graalvm.word.WordFactory;
  * Channel connects two {@link JVM} instances. A "channel" creates two (almost)
  * identical instances of the {@code Channel} on both sides of the "channel" -
  * e.g. in each of the JVMs. The instances are initialized with the same
- * {@link Serde}, so they both understand the same messages and communicate with
- * each other.
+ * {@link Config}, so they both understand the same messages when communicating
+ * with each other.
  *
  * @param <Data> internal data of the channel
  */
@@ -72,11 +74,6 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
      */
     private final Data data;
 
-    /**
-     * persistance pool associated with this channel object
-     */
-    private final Serde pool;
-
     private final long id;
     private final JVM jvm;
     private final byte type;
@@ -98,7 +95,6 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         this.channelClass = handleClass;
         this.channelHandle = handleFn;
         this.otherMockChannel = null;
-        this.pool = data.createPool(this);
     }
 
     /**
@@ -130,7 +126,6 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                             ValueLayout.JAVA_LONG);
             this.callbackFn = Linker.nativeLinker().downcallHandle(fnCallbackAddress, fnDescriptor);
         }
-        this.pool = data.createPool(this);
     }
 
     /**
@@ -155,7 +150,6 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                         ? otherOrNull // use other channel when provided
                         : // otherwise allocate new and pass this reference to it
                         new Channel<>(TYPE_MOCK_SLAVE, otherData, this, null, id);
-        this.pool = data.createPool(this);
     }
 
     /**
@@ -183,13 +177,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         var e = jvm.env();
         var classNameWithSlashes = Channel.class.getName().replace('.', '/');
         try (
-            var classInC = CTypeConversion.toCString(classNameWithSlashes);
-            var poolClassInC = CTypeConversion.toCString(configClass.getName());
-            var createInC = CTypeConversion.toCString("createJvmPeerChannel");
-            var createSigInC = CTypeConversion.toCString("(JJJLjava/lang/String;)Z");
-            var handleInC = CTypeConversion.toCString("handleJvmMessage");
-            var handleSigInC = CTypeConversion.toCString("(JJJJ)J");
-        ) {
+                var classInC = CTypeConversion.toCString(classNameWithSlashes); var poolClassInC = CTypeConversion.toCString(configClass.getName()); var createInC = CTypeConversion.toCString("createJvmPeerChannel"); var createSigInC = CTypeConversion.toCString("(JJJLjava/lang/String;)Z"); var handleInC = CTypeConversion.toCString("handleJvmMessage"); var handleSigInC = CTypeConversion.toCString("(JJJJ)J");) {
             var fn = e.getFunctions();
             var channelClass = fn.getFindClass().call(e, classInC.get());
             if (channelClass.isNull()) {
@@ -264,13 +252,9 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
 
     /**
      * <em>Executes a message</em> in the other JVM. The message is any subclass
-     * of {@link Function} registered for persistance via {@link Serde}
-     * annotation into the {@link
-     * Serde pool associated with this JVM}. The result (which is of type
-     * {@code R}) also has to be registered for serde.
-     *
-     * <p>
-     * </p>
+     * of {@link Function} ready to be serialized/deserialized via channel's
+     * {@link Config}. The result (which is of type {@code R}) also has to be
+     * registered for serialization/deserialization.
      *
      * @param <C> the actual type of the {@link Config} subclass
      * @param resultType class with the type of {@code R} to use for
@@ -286,7 +270,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
     @SuppressWarnings("unchecked")
     public final <C, R extends C> R execute(
             Class<C> resultType, Function<? super Channel<Data>, R> msg) {
-        var r = (R) executeImpl(pool, resultType, (Function) msg);
+        var r = (R) executeImpl(resultType, (Function) msg);
         return r;
     }
 
@@ -351,11 +335,11 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         // clean any previous overflow buffer
         keepLastOverflowBuffer.set(null);
 
-        var ref = channel.pool.read(buf);
+        var ref = channel.data.read(buf);
         var msg = Function.class.cast(ref);
         @SuppressWarnings("unchecked")
         var res = msg.apply(channel);
-        var bytes = channel.pool.write(res);
+        var bytes = channel.data.write(res);
         if (bytes.length <= buf.limit()) {
             buf.put(0, bytes);
             return bytes.length;
@@ -446,13 +430,12 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
     }
 
     private <R> R executeImpl(
-            Serde pool,
             Class<R> replyType,
             Function<Channel<? extends Data>, ? extends R> msg) {
         var address = 0L;
         var useMalloc = isMaster() && !isDirect();
         try {
-            var bytes = pool.write(msg);
+            var bytes = data.write(msg);
             var size = Math.max(bytes.length, 4096);
             long len;
             ByteBuffer buffer;
@@ -493,7 +476,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
             assert len >= 0;
             buffer.position(0);
             buffer.limit(Math.toIntExact(len));
-            var result = pool.read(buffer);
+            var result = data.read(buffer);
             return replyType.cast(result);
         } catch (IOException ex) {
             throw new IllegalStateException(ex);
@@ -544,11 +527,25 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         }
 
         /**
-         * Creates instance of pool for persisting messages.
+         * Configuration must be capable to serialize messages sent to the
+         * channel into {@code byte[]}. The sibling function {@link #read} must
+         * then be capable to reconstruct the object back.
          *
-         * @param channel the channel associated with this {@code Config}
-         * @return the pool to use when sending messages
+         * @param obj the object with the message to transfer
+         * @return serialized form representing the provided object
+         * @throws IOException if the conversion goes wrong
+         * @see #read(java.nio.ByteBuffer)
          */
-        public abstract Serde createPool(Channel<?> channel);
+        public abstract byte[] write(Object obj) throws IOException;
+
+        /**
+         * Deserializes bytes of a message into an object representing them.
+         * Operates in reverse to {@link #write} function.
+         *
+         * @param buf the buffer with stored data
+         * @return object representing the message stored in the buffer
+         * @throws IOException if the conversion fails for some reason
+         */
+        public abstract Object read(ByteBuffer buf) throws IOException;
     }
 }

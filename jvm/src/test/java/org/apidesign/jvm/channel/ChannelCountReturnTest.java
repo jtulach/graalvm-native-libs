@@ -114,12 +114,7 @@ public class ChannelCountReturnTest {
      * and deserialization of {@link Long} and {@link CountDownAndReturn}. The
      * serialization support is written manually by hand.
      */
-    public static final class Conf extends Channel.Config implements Serde {
-        @Override
-        public Serde createPool(Channel<?> channel) {
-            return this;
-        }
-
+    public static final class Conf extends Channel.Config {
         @Override
         public byte[] write(Object obj) throws IOException {
             var bos = new ByteArrayOutputStream();

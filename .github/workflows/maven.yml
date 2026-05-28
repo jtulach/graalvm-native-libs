@@ -24,3 +24,7 @@ jobs:
 
     - name: Build Native
       run: mvn -Pnative -B package --file pom.xml
+
+    - name: Generate Javadoc
+      run: mvn javadoc:jar
+

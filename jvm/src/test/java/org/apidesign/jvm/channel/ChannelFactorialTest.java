@@ -117,13 +117,7 @@ final class ChannelFactorialTest {
      * messages {@link RequestFactorial}, {@link ComputeFactorial}, and
      * {@link ReportResult}.
      */
-    public static final class Conf extends Channel.Config implements Serde {
-
-        @Override
-        public Serde createPool(Channel<?> channel) {
-            return this;
-        }
-
+    public static final class Conf extends Channel.Config {
         @Override
         public byte[] write(Object obj) throws IOException {
             var bos = new ByteArrayOutputStream();
