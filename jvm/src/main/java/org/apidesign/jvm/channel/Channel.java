@@ -1,13 +1,12 @@
 package org.apidesign.jvm.channel;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -339,20 +338,32 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         var msg = Function.class.cast(ref);
         @SuppressWarnings("unchecked")
         var res = msg.apply(channel);
-        var bytes = channel.data.write(res);
-        if (bytes.length <= buf.limit()) {
-            buf.put(0, bytes);
-            return bytes.length;
-        } else {
-            var ownBuffer = ByteBuffer.allocateDirect(bytes.length);
-            ownBuffer.put(0, bytes);
-            var ownSeg = MemorySegment.ofBuffer(ownBuffer);
-            buf.position(0); // at begining put
-            buf.limit(16); // two longs
-            buf.putLong(bytes.length);
-            buf.putLong(ownSeg.address());
-            keepLastOverflowBuffer.set(buf);
-            return RET_CODE_OVERFLOW;
+        try {
+            buf.clear();
+            channel.data.write(res, buf);
+            var len = buf.limit();
+            buf.position(0);
+            buf.limit(buf.capacity());
+            return len;
+        } catch (BufferOverflowException ex) {
+            var size = computeLargerSize(buf.capacity(), ex);
+            for (;;) {
+                var ownBuffer = ByteBuffer.allocateDirect(size);
+                try {
+                    channel.data.write(res, ownBuffer);
+                    var len = ownBuffer.limit();
+                    ownBuffer.position(0);
+                    var ownSeg = MemorySegment.ofBuffer(ownBuffer);
+                    buf.position(0); // at begining put
+                    buf.limit(16); // two longs
+                    buf.putLong(len);
+                    buf.putLong(ownSeg.address());
+                    keepLastOverflowBuffer.set(buf);
+                    return RET_CODE_OVERFLOW;
+                } catch (BufferOverflowException ex2) {
+                    size = computeLargerSize(size, ex2);
+                }
+            }
         }
     }
 
@@ -435,21 +446,40 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         var address = 0L;
         var useMalloc = isMaster() && !isDirect();
         try {
-            var bytes = data.write(msg);
-            var size = Math.max(bytes.length, 4096);
-            long len;
+            var size = 4096;
             ByteBuffer buffer;
+            while (true) {
+                try {
+                    if (useMalloc) {
+                        var memory = UnmanagedMemory.malloc(size);
+                        buffer = asNativeByteBuffer(memory, size);
+                        try {
+                            data.write(msg, buffer);
+                            address = memory.rawValue();
+                            break;
+                        } catch (Throwable t) {
+                            buffer = null;
+                            UnmanagedMemory.free(memory);
+                            throw t;
+                        }
+                    } else {
+                        buffer = ByteBuffer.allocateDirect(size);
+                        var memory = MemorySegment.ofBuffer(buffer);
+                        data.write(msg, buffer);
+                        address = memory.address();
+                        break;
+                    }
+                } catch (BufferOverflowException ex) {
+                    size = computeLargerSize(size, ex);
+                }
+            }
+            buffer.position(0);
+            buffer.limit(buffer.capacity());
+            long len;
             if (useMalloc) {
-                var memory = UnmanagedMemory.malloc(size);
-                buffer = asNativeByteBuffer(memory, size);
-                buffer.put(0, bytes);
-                address = memory.rawValue();
                 len = toHotSpotMessage(address, size);
             } else {
-                buffer = ByteBuffer.allocateDirect(size);
-                var memory = MemorySegment.ofBuffer(buffer);
-                memory.copyFrom(MemorySegment.ofArray(bytes));
-                address = memory.address();
+                var memory = MemorySegment.ofAddress(address).reinterpret(size);
                 len = isDirect() ? toDirectMessage(buffer) : toSubstrateMessage(memory);
             }
             if (len == RET_CODE_EXCEPTION) {
@@ -502,6 +532,19 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         return reply;
     }
 
+    /** Right now just multiplies the incomming {@code size} by two.
+     * In the future there could be a special subclass of the exception
+     * that would carry the expected size of the buffer. Then the next value
+     * would be extracted from the exception itself.
+     *
+     * @param size the current size
+     * @param ex the exception to extract requested size from (in the future)
+     * @return new size to use
+     */
+    private static int computeLargerSize(int size, BufferOverflowException ex) {
+        return size * 2;
+    }
+
     @Override
     public void close() throws Exception {
         ID_TO_CHANNEL.remove(id, this);
@@ -532,11 +575,12 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
          * then be capable to reconstruct the object back.
          *
          * @param obj the object with the message to transfer
-         * @return serialized form representing the provided object
+         * @param buf buffer to put the serialized form representing the provided object into
          * @throws IOException if the conversion goes wrong
-         * @see #read(java.nio.ByteBuffer)
+         * @throws BufferOverflowException when the {@link ByteBuffer#limit()} is reached and needs to be increased
+         * @see #read
          */
-        public abstract byte[] write(Object obj) throws IOException;
+        public abstract void write(Object obj, ByteBuffer buf) throws IOException, BufferOverflowException;
 
         /**
          * Deserializes bytes of a message into an object representing them.

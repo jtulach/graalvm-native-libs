@@ -91,26 +91,22 @@ public class ChannelCountThrowTest {
      */
     public static final class Conf extends Channel.Config {
         @Override
-        public byte[] write(Object obj) throws IOException {
-            var bos = new ByteArrayOutputStream();
-            try (var dos = new DataOutputStream(bos)) {
-                switch (obj) {
-                    case Long v -> {
-                        dos.writeByte(7);
-                        dos.writeLong(v);
-                    }
-                    case CountDownAndThrow v -> {
-                        dos.writeByte(33);
-                        dos.writeLong(v.value());
-                        dos.writeLong(v.acc());
-                    }
-                    case null ->
-                        throw new IOException("null");
-                    default ->
-                        throw new IOException("" + obj + " type: " + obj.getClass());
+        public void write(Object obj, ByteBuffer buf) throws IOException {
+            switch (obj) {
+                case Long v -> {
+                    buf.put((byte)7);
+                    buf.putLong(v);
                 }
+                case CountDownAndThrow v -> {
+                    buf.put((byte)33);
+                    buf.putLong(v.value());
+                    buf.putLong(v.acc());
+                }
+                case null ->
+                    throw new IOException("null");
+                default ->
+                    throw new IOException("" + obj + " type: " + obj.getClass());
             }
-            return bos.toByteArray();
         }
 
         @Override

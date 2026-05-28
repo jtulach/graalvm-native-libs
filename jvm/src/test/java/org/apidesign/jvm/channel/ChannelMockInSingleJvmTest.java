@@ -236,12 +236,13 @@ public class ChannelMockInSingleJvmTest {
         }
 
         @Override
-        public byte[] write(Object obj) throws IOException {
-            var arr = new ByteArrayOutputStream();
-            try (var dos = new ObjectOutputStream(arr)) {
+        public void write(Object obj, ByteBuffer buf) throws IOException {
+            var bos = new ByteArrayOutputStream();
+            try (var dos = new ObjectOutputStream(bos)) {
                 dos.writeObject(obj);
             }
-            return arr.toByteArray();
+            var arr = bos.toByteArray();
+            buf.put(arr);
         }
 
         @Override

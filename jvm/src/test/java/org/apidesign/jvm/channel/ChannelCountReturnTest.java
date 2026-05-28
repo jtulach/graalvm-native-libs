@@ -116,7 +116,7 @@ public class ChannelCountReturnTest {
      */
     public static final class Conf extends Channel.Config {
         @Override
-        public byte[] write(Object obj) throws IOException {
+        public void write(Object obj, ByteBuffer buf) throws IOException {
             var bos = new ByteArrayOutputStream();
             try (var dos = new DataOutputStream(bos)) {
                 switch (obj) {
@@ -133,7 +133,7 @@ public class ChannelCountReturnTest {
                     default -> throw new IOException("" + obj + " type: " + obj.getClass());
                 }
             }
-            return bos.toByteArray();
+            buf.put(bos.toByteArray());
         }
 
         @Override
