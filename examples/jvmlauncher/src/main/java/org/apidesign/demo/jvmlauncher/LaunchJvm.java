@@ -14,20 +14,34 @@
 package org.apidesign.demo.jvmlauncher;
 
 import java.io.File;
-import java.util.List;
-import org.graalvm.nativeimage.ImageInfo;
+import java.util.ArrayList;
+import java.util.Arrays;
 import org.apidesign.jvm.channel.JVM;
 
 public final class LaunchJvm {
-    private static final boolean AOT = ImageInfo.inImageRuntimeCode();
-
     public static void main(String[] args) {
-        if (AOT && List.of(args).contains("--jvm")) {
-            var javaHome = new File(System.getenv("JAVA_HOME"));
-            var jvm = JVM.create(javaHome, "-Djava.class.path=target/classes");
-            jvm.executeMain("org/apidesign/demo/jvmlauncher/LaunchJvm", args);
+        var argList = new ArrayList<>(Arrays.asList(args));
+        var argJvmAt = argList.indexOf("--jvm");
+        if (argJvmAt >= 0) {
+            argList.remove(argJvmAt);
+            var filteredArgs = argList.toArray(new String[0]);
+
+            var javaHome = System.getenv("JAVA_HOME");
+            assumeOrExit(1, "The environment variable JAVA_HOME must be defined", javaHome != null);
+            var javaDir = new File(javaHome);
+            assumeOrExit(2, "JAVA_HOME variable must point to a JDK directory, but was " + javaDir, javaDir.isDirectory());
+
+            var jvm = JVM.create(javaDir, "-Djava.class.path=target/classes");
+            jvm.executeMain("org/apidesign/demo/jvmlauncher/LaunchJvm", filteredArgs);
             return;
         }
         System.err.println("Running in: " + System.getProperty("java.vm.name"));
+    }
+
+    private static void assumeOrExit(int exitCode, String msg, boolean check) {
+        if (!check) {
+            System.err.println(msg);
+            System.exit(exitCode);
+        }
     }
 }

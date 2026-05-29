@@ -25,9 +25,9 @@
     <groupId>org.apidesign.demo</groupId>
     <artifactId>jvmlauncher</artifactId>
     <packaging>jar</packaging>
-    
+
     <name>org.apidesign.demo.jvmlauncher</name>
-    
+
     <properties>
         <exec.mainClass>org.apidesign.demo.jvmlauncher.LaunchJvm</exec.mainClass>
         <repoDir>../..</repoDir>
@@ -39,6 +39,17 @@
             <version>${project.version}</version>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>25</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
     <profiles>
         <profile>
             <id>native</id>
