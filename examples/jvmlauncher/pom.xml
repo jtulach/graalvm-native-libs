@@ -20,7 +20,7 @@
         <groupId>org.apidesign.graalvm</groupId>
         <artifactId>pom</artifactId>
         <version>2.0-SNAPSHOT</version>
-        <relativePath>../../pom.xml</relativePath>
+        <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
     <artifactId>jvmlauncher</artifactId>
@@ -51,6 +51,12 @@
                 <configuration>
                     <source>25</source>
                     <target>8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
         </plugins>
