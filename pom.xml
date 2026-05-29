@@ -107,8 +107,16 @@
                         <archive>
                             <manifestEntries>
                                 <Multi-Release>true</Multi-Release>
+                                <Automatic-Module-Name>${moduleName}</Automatic-Module-Name>
                             </manifestEntries>
                         </archive>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.11.2</version>
+                    <configuration>
                     </configuration>
                 </plugin>
                 <plugin>
