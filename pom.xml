@@ -139,7 +139,7 @@
                             <goals>
                                 <goal>compile-no-fork</goal>
                             </goals>
-                            <phase>package</phase>
+                            <phase>process-test-resources</phase>
                             <configuration>
                             </configuration>
                         </execution>

@@ -31,12 +31,17 @@
     <properties>
         <exec.mainClass>org.apidesign.demo.jvmlauncher.LaunchJvm</exec.mainClass>
         <repoDir>../..</repoDir>
+        <skipTests>true</skipTests>
     </properties>
     <dependencies>
         <dependency>
             <groupId>org.apidesign.graalvm</groupId>
             <artifactId>jvm-channel</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
         </dependency>
     </dependencies>
     <build>
@@ -53,6 +58,10 @@
     <profiles>
         <profile>
             <id>native</id>
+            <properties>
+                <skipTests>false</skipTests>
+                <skipNativeTests>true</skipNativeTests>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
