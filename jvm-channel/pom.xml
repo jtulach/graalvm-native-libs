@@ -22,10 +22,11 @@
         <version>1.0</version>
     </parent>
     <artifactId>jvm-channel</artifactId>
+    <name>org.apidesign.jvm.channel</name>
     <packaging>jar</packaging>
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
-        <moduleName>org.apidesign.jvm.channel</moduleName>
+        <repoDir>..</repoDir>
     </properties>
     <dependencies>
         <dependency>
