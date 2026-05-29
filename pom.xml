@@ -20,6 +20,13 @@
     <artifactId>pom</artifactId>
     <version>1.0</version>
     <packaging>pom</packaging>
+    
+    <name>Extra GraalVM Native Utilities</name>
+    <url>https://github.com/jtulach/graalvm-native-libs</url>
+    <description>
+    This package contains useful utilities for working with GraalVM native-image ahead-of-time compilation.
+    </description>
+    
     <modules>
         <module>jvm-channel</module>
     </modules>
