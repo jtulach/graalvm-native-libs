@@ -25,7 +25,7 @@ public final class LaunchJvm {
         if (AOT && List.of(args).contains("--jvm")) {
             var javaHome = new File(System.getenv("JAVA_HOME"));
             var jvm = JVM.create(javaHome, "-Djava.class.path=target/classes");
-            jvm.executeMain("org/apidesign/demo/jvmlauncher/Launcher", args);
+            jvm.executeMain("org/apidesign/demo/jvmlauncher/LaunchJvm", args);
             return;
         }
         System.err.println("Running in: " + System.getProperty("java.vm.name"));
