@@ -29,6 +29,7 @@
     
     <modules>
         <module>jvm-channel</module>
+        <module>examples/jvmlauncher</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -138,9 +139,8 @@
                             <goals>
                                 <goal>compile-no-fork</goal>
                             </goals>
-                            <phase>package</phase>
+                            <phase>process-test-resources</phase>
                             <configuration>
-                                <sharedLibrary>true</sharedLibrary>
                             </configuration>
                         </execution>
                         <execution>
