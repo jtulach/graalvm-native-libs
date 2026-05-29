@@ -55,7 +55,9 @@ public class LaunchJvmTest {
     @Test
     public void executeNativeExeWithJvm() throws Exception {
         var output = executeProg(prog.getAbsolutePath(), "--jvm");
-        assertEquals("Running in: OpenJDK 64-Bit Server VM", output);
+        var openJDK = output.contains("OpenJDK"); // OpenJDK 64-Bit Server VM
+        var hotSpot = output.contains("HotSpot"); // Java HotSpot(TM) 64-Bit Server VM
+        assertTrue(openJDK || hotSpot, "Expecting HotSpot VM, but was: " + output);
     }
 
     private static String executeProg(String... args) throws IOException, InterruptedException {
