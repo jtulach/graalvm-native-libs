@@ -12,6 +12,6 @@
  * limitations under the License.
  */
 module org.apidesign.jvm.channel {
-    requires org.graalvm.sdk;
+    requires org.graalvm.nativeimage;
     exports org.apidesign.jvm.channel;
 }
