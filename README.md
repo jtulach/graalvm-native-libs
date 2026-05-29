@@ -7,7 +7,7 @@ ahead-of-time compilation. What can you do with these utilities?
 
 It is common in the GraalVM world to support `--jvm` option. By default an application runs compiled
 into _native executable_, but when `--jvm` option is added, it can **relaunch itself** in HotSpot JVM
-mode. Let's do that with the help of this project! Add a simple Maven dependency:
+mode. Let's do that with the help of this project! Add a simple [Maven dependency](https://central.sonatype.com/artifact/org.apidesign.graalvm/jvm-channel):
 
 ```xml
 <dependency>
@@ -16,7 +16,7 @@ mode. Let's do that with the help of this project! Add a simple Maven dependency
 </dependency>
 ```
 
-Now let's use the [JVM class](http://hudson.apidesign.org/job/graalvm-native-libs/8/javadoc/) 
+Now let's use the [JVM class](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/org.apidesign.jvm.channel/org/apidesign/jvm/channel/JVM.html)
 to launch the HotSpot JVM (in the same process!) when needed:
 
 ```java
@@ -45,4 +45,4 @@ main class in the HotSpot JVM. There was no additional communication between the
 That's OK for a simple launcher scenario, but for more intricate use-cases some communication may be needed.
 
 That's why this project supports exchange of messages between the JVMs launched via the `JVM` class. Just use the
-[Channel class](http://hudson.apidesign.org/job/graalvm-native-libs/8/javadoc/). Details are coming...
+[Channel class](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/). Details are coming...
