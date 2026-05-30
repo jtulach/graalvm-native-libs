@@ -30,6 +30,7 @@
     <modules>
         <module>jvm-channel</module>
         <module>examples/jvmlauncher</module>
+        <module>examples/jvmchannel</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
