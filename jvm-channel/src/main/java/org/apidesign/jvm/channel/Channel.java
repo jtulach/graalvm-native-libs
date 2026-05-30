@@ -453,61 +453,78 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         }
     }
 
-    private static final class ExchangeBuffer implements AutoCloseable {
-        private final boolean useMalloc;
+    private static interface ExchangeBuffer extends AutoCloseable {
+        static ExchangeBuffer create(boolean useMalloc) {
+            return useMalloc ? new ExchangeBufferMalloc() : new ExchangeBufferSegment();
+        }
+
+        ByteBuffer realloc(int size);
+        @Override
+        void close();
+        long address();
+        ByteBuffer wrap(long addr, int size);
+    }
+
+    private static final class ExchangeBufferMalloc implements ExchangeBuffer {
         private ByteBuffer currentBuffer;
         private PointerBase currentPointer = WordFactory.nullPointer();
-        private MemorySegment currentAddress;
 
-        ExchangeBuffer(boolean useMalloc) {
-            this.useMalloc = useMalloc;
-        }
-
-        static ExchangeBuffer create(boolean useMalloc) {
-            return new ExchangeBuffer(useMalloc);
-        }
-
-        ByteBuffer realloc(int size) {
-            if (useMalloc) {
-                if (currentBuffer != null) {
-                    currentPointer = UnmanagedMemory.realloc(currentPointer, WordFactory.unsigned(size));
-                    currentBuffer = asNativeByteBuffer(currentPointer, size);
-                } else {
-                    currentPointer = UnmanagedMemory.malloc(size);
-                    currentBuffer = asNativeByteBuffer(currentPointer, size);
-                }
-                return currentBuffer;
+        @Override
+        public ByteBuffer realloc(int size) {
+            if (currentBuffer != null) {
+                currentPointer = UnmanagedMemory.realloc(currentPointer, WordFactory.unsigned(size));
+                currentBuffer = asNativeByteBuffer(currentPointer, size);
             } else {
-                currentBuffer = ByteBuffer.allocateDirect(size);
-                currentAddress = MemorySegment.ofBuffer(currentBuffer);
+                currentPointer = UnmanagedMemory.malloc(size);
+                currentBuffer = asNativeByteBuffer(currentPointer, size);
             }
             return currentBuffer;
         }
 
-        final long address() {
-            if (useMalloc) {
-                return currentPointer.rawValue();
-            } else {
-                return currentAddress.address();
-            }
+        @Override
+        public long address() {
+            return currentPointer.rawValue();
         }
 
-        final ByteBuffer wrap(long addr, long len) {
-            if (useMalloc) {
-                var overflowPtr = WordFactory.pointer(addr);
-                return CTypeConversion.asByteBuffer(overflowPtr, Math.toIntExact(len))
-                        .order(ByteOrder.BIG_ENDIAN);
-            } else {
-                var overflowSegment = MemorySegment.ofAddress(addr).reinterpret(len);
-                return overflowSegment.asByteBuffer();
-            }
+        @Override
+        public ByteBuffer wrap(long addr, int len) {
+            var ptr = WordFactory.pointer(addr);
+            var buf = CTypeConversion.asByteBuffer(ptr, len);
+            return buf.order(ByteOrder.BIG_ENDIAN);
         }
 
         @Override
         public void close() {
-            if (useMalloc && currentBuffer != null) {
+            if (currentBuffer != null) {
                 UnmanagedMemory.free(currentPointer);
             }
+        }
+    }
+    private static final class ExchangeBufferSegment implements ExchangeBuffer {
+        private ByteBuffer currentBuffer;
+        private MemorySegment currentAddress;
+
+        @Override
+        public ByteBuffer realloc(int size) {
+            currentBuffer = ByteBuffer.allocateDirect(size);
+            currentAddress = MemorySegment.ofBuffer(currentBuffer);
+            return currentBuffer;
+        }
+
+        @Override
+        public long address() {
+            return currentAddress.address();
+        }
+
+        @Override
+        public final ByteBuffer wrap(long addr, int len) {
+            var seg = MemorySegment.ofAddress(addr).reinterpret(len);
+            return seg.asByteBuffer();
+        }
+
+        @Override
+        public void close() {
+            // rely on GC
         }
     }
 
@@ -549,7 +566,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                 len = buffer.getLong();
                 // read address
                 var addr = buffer.getLong();
-                buffer = exchange.wrap(addr, len);
+                buffer = exchange.wrap(addr, Math.toIntExact(len));
             }
             assert len >= 0;
             buffer.position(0);
