@@ -453,35 +453,78 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         }
     }
 
+    private static final class ExchangeBuffer implements AutoCloseable {
+        private final boolean useMalloc;
+        private ByteBuffer currentBuffer;
+        private PointerBase currentPointer = WordFactory.nullPointer();
+        private MemorySegment currentAddress;
+
+        ExchangeBuffer(boolean useMalloc) {
+            this.useMalloc = useMalloc;
+        }
+
+        static ExchangeBuffer create(boolean useMalloc) {
+            return new ExchangeBuffer(useMalloc);
+        }
+
+        ByteBuffer realloc(int size) {
+            if (useMalloc) {
+                if (currentBuffer != null) {
+                    currentPointer = UnmanagedMemory.realloc(currentPointer, WordFactory.unsigned(size));
+                    currentBuffer = asNativeByteBuffer(currentPointer, size);
+                } else {
+                    currentPointer = UnmanagedMemory.malloc(size);
+                    currentBuffer = asNativeByteBuffer(currentPointer, size);
+                }
+                return currentBuffer;
+            } else {
+                currentBuffer = ByteBuffer.allocateDirect(size);
+                currentAddress = MemorySegment.ofBuffer(currentBuffer);
+            }
+            return currentBuffer;
+        }
+
+        final long address() {
+            if (useMalloc) {
+                return currentPointer.rawValue();
+            } else {
+                return currentAddress.address();
+            }
+        }
+
+        final ByteBuffer wrap(long addr, long len) {
+            if (useMalloc) {
+                var overflowPtr = WordFactory.pointer(addr);
+                return CTypeConversion.asByteBuffer(overflowPtr, Math.toIntExact(len))
+                        .order(ByteOrder.BIG_ENDIAN);
+            } else {
+                var overflowSegment = MemorySegment.ofAddress(addr).reinterpret(len);
+                return overflowSegment.asByteBuffer();
+            }
+        }
+
+        @Override
+        public void close() {
+            if (useMalloc && currentBuffer != null) {
+                UnmanagedMemory.free(currentPointer);
+            }
+        }
+    }
+
     private <R> R executeImpl(
             Class<R> replyType,
             Function<Channel<? extends Data>, ? extends R> msg) {
-        var address = 0L;
         var useMalloc = isMaster() && !isDirect();
-        try {
+        try (
+            var exchange = ExchangeBuffer.create(useMalloc)
+        ) {
             var size = 4096;
             ByteBuffer buffer;
-            while (true) {
+            for (;;) {
                 try {
-                    if (useMalloc) {
-                        var memory = UnmanagedMemory.malloc(size);
-                        buffer = asNativeByteBuffer(memory, size);
-                        try {
-                            data.write(msg, buffer);
-                            address = memory.rawValue();
-                            break;
-                        } catch (Throwable t) {
-                            buffer = null;
-                            UnmanagedMemory.free(memory);
-                            throw t;
-                        }
-                    } else {
-                        buffer = ByteBuffer.allocateDirect(size);
-                        var memory = MemorySegment.ofBuffer(buffer);
-                        data.write(msg, buffer);
-                        address = memory.address();
-                        break;
-                    }
+                    buffer = exchange.realloc(size);
+                    data.write(msg, buffer);
+                    break;
                 } catch (BufferOverflowException ex) {
                     size = computeLargerSize(size, ex);
                 }
@@ -490,9 +533,9 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
             buffer.limit(buffer.capacity());
             long len;
             if (useMalloc) {
-                len = toHotSpotMessage(address, size);
+                len = toHotSpotMessage(exchange.address(), size);
             } else {
-                var memory = MemorySegment.ofAddress(address).reinterpret(size);
+                var memory = MemorySegment.ofAddress(exchange.address()).reinterpret(size);
                 len = isDirect() ? toDirectMessage(buffer) : toSubstrateMessage(memory);
             }
             if (len == RET_CODE_EXCEPTION) {
@@ -506,15 +549,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                 len = buffer.getLong();
                 // read address
                 var addr = buffer.getLong();
-                if (useMalloc) {
-                    var overflowPtr = WordFactory.pointer(addr);
-                    buffer
-                            = CTypeConversion.asByteBuffer(overflowPtr, Math.toIntExact(len))
-                                    .order(ByteOrder.BIG_ENDIAN);
-                } else {
-                    var overflowSegment = MemorySegment.ofAddress(addr).reinterpret(len);
-                    buffer = overflowSegment.asByteBuffer();
-                }
+                buffer = exchange.wrap(addr, len);
             }
             assert len >= 0;
             buffer.position(0);
@@ -523,10 +558,6 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
             return replyType.cast(result);
         } catch (IOException ex) {
             throw new IllegalStateException(ex);
-        } finally {
-            if (useMalloc) {
-                UnmanagedMemory.free(WordFactory.pointer(address));
-            }
         }
     }
 
