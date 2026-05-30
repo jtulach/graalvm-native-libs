@@ -23,7 +23,7 @@
         <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
-    <artifactId>jvmlauncher</artifactId>
+    <artifactId>jvmchannel</artifactId>
     <packaging>jar</packaging>
 
     <name>org.apidesign.demo.jvmchannel</name>
