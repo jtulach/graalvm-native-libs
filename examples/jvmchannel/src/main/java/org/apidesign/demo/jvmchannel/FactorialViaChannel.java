@@ -15,7 +15,6 @@ package org.apidesign.demo.jvmchannel;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.math.BigInteger;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -33,21 +32,25 @@ public final class FactorialViaChannel {
         var javaDir = new File(javaHome);
         assumeOrExit(2, "JAVA_HOME variable must point to a JDK directory, but was " + javaDir, javaDir.isDirectory());
 
-        var jvm = JVM.create(javaDir, "-Djava.class.path=target/classes");
+        var jvm = JVM.create(javaDir,
+            "-Djava.class.path=" + cp("target/classes", "target/dependency")
+        );
         var ch = Channel.create(jvm, SerdeConf.class);
+
+        log("Sending %s to HotSpot JVM\n", args[0]);
         ch.execute(Void.class, new RequestFactorial(args[0]));
     }
 
     record RequestFactorial(String number) implements Function<Channel<?>, Void> {
         @Override
         public Void apply(Channel<?> channel) {
-            log("Parsing %n as long number\n", number);
+            log("Parsing %s as long number\n", number);
             var n = Long.parseLong(number);
             var acc = BigInteger.ONE;
-            for (var i = 0l; i < n; i++) {
+            for (var i = 1l; i <= n; i++) {
                 acc = acc.multiply(BigInteger.valueOf(i));
             }
-            log("Computed the result to %n sending to the other JVM\n", acc);
+            log("Result computed to %d - sending it to the other JVM\n", acc);
             channel.execute(Void.class, new ReportResult(n, acc));
             return null;
         }
@@ -61,6 +64,11 @@ public final class FactorialViaChannel {
         }
     }
 
+    /** Manually written serde. E.g. serialization and deserialization of
+     * {@link RequestFactorial}, {@link ReportResult} and {@code null}.
+     * There are other means of generating the serde, but for a simple case
+     * like this writing the class manually is simple and the least magical.
+     */
     public static final class SerdeConf extends Channel.Config {
         private static final byte NULL = 0x00;
         private static final byte REQUEST = 0x01;
@@ -114,9 +122,21 @@ public final class FactorialViaChannel {
         }
     }
 
+    private static String cp(String... elems) {
+        var sb = new StringBuilder();
+        for (var e : elems) {
+            var withCorrectSlash = e.replace('/', File.separatorChar);
+            if (sb.length() > 0) {
+                sb.append(File.pathSeparator);
+            }
+            sb.append(withCorrectSlash);
+        }
+        return sb.toString();
+    }
+
     private static void log(String fmt, Object... args) {
         var vm = System.getProperty("java.vm.name");
-        System.err.printf("[" + vm + "]" + fmt, args);
+        System.err.printf("[" + vm + "] " + fmt, args);
     }
 
     private static void assumeOrExit(int exitCode, String msg, boolean check) {
