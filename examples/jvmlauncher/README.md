@@ -7,7 +7,7 @@ HotSpot JVM when a command line `--jvm` switch is found.
 
 ### Build & Run
 
-Clone this repository, and build it:
+Clone [this repository](https://github.com/jtulach/graalvm-native-libs), and build it:
 ```bash
 graalvm-native-libs$ export JAVA_HOME=/graalvm-25/
 graalvm-native-libs$ mvn clean install

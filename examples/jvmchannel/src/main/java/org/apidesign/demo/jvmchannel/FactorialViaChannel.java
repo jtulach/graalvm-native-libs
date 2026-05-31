@@ -41,9 +41,9 @@ public final class FactorialViaChannel {
         ch.execute(Void.class, new RequestFactorial(args[0]));
     }
 
-    record RequestFactorial(String number) implements Function<Channel<?>, Void> {
+    record RequestFactorial(String number) implements Function<Channel<SerdeConf>, Void> {
         @Override
-        public Void apply(Channel<?> channel) {
+        public Void apply(Channel<SerdeConf> channel) {
             log("Parsing %s as long number\n", number);
             var n = Long.parseLong(number);
             var acc = BigInteger.ONE;
@@ -56,9 +56,9 @@ public final class FactorialViaChannel {
         }
     }
 
-    record ReportResult(long number, BigInteger result) implements Function<Channel, Void> {
+    record ReportResult(long number, BigInteger result) implements Function<Channel<?>, Void> {
         @Override
-        public Void apply(Channel otherVM) {
+        public Void apply(Channel<?> otherVM) {
             log("Obtained result fac(%d) is %d\n", number, result);
             return null;
         }

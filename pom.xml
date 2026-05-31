@@ -35,6 +35,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <repoDir>${basedir}</repoDir>
+        <moduleName>${project.name}</moduleName>
     </properties>
     <licenses>
         <license>
@@ -117,7 +118,7 @@
                         <archive>
                             <manifestEntries>
                                 <Multi-Release>true</Multi-Release>
-                                <Automatic-Module-Name>${project.name}</Automatic-Module-Name>
+                                <Automatic-Module-Name>${moduleName}</Automatic-Module-Name>
                             </manifestEntries>
                         </archive>
                     </configuration>
