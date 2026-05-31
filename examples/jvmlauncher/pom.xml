@@ -26,7 +26,7 @@
     <artifactId>jvmlauncher</artifactId>
     <packaging>jar</packaging>
 
-    <name>org.apidesign.demo.jvmlauncher</name>
+    <name>Example: Launch 2nd JVM</name>
 
     <properties>
         <exec.mainClass>org.apidesign.demo.jvmlauncher.LaunchJvm</exec.mainClass>

@@ -23,10 +23,10 @@
         <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
-    <artifactId>jvmlauncher</artifactId>
+    <artifactId>jvmchannel</artifactId>
     <packaging>jar</packaging>
 
-    <name>org.apidesign.demo.jvmchannel</name>
+    <name>Example: Channel Between JVMs</name>
 
     <properties>
         <exec.mainClass>org.apidesign.demo.jvmchannel.FactorialViaChannel</exec.mainClass>
