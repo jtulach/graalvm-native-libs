@@ -23,14 +23,14 @@
         <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
-    <artifactId>jvmlauncher</artifactId>
+    <artifactId>jvmchannel</artifactId>
     <packaging>jar</packaging>
 
-    <name>Example: Launch 2nd JVM</name>
+    <name>Example: Channel Between JVMs</name>
 
     <properties>
-        <moduleName>org.apidesign.demo.jvmlauncher</moduleName>
-        <exec.mainClass>${moduleName}.LaunchJvm</exec.mainClass>
+        <moduleName>org.apidesign.demo.jvmchannel</moduleName>
+        <exec.mainClass>${moduleName}.FactorialViaChannel</exec.mainClass>
         <repoDir>../..</repoDir>
         <skipTests>true</skipTests>
     </properties>
@@ -51,8 +51,20 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <source>25</source>
-                    <target>8</target>
+                    <target>25</target>
                 </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>transitive-classes</id>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <phase>process-classes</phase>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-javadoc-plugin</artifactId>
