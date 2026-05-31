@@ -56,7 +56,7 @@ default constructor and needs to be available on the class path/module path
 of both JVMs.
 
 This example implements the `SerdeConf` class manually. For more complex
-set of message one may want to use `java.io.ObjectOutputStream` serialization
+set of messages one may want to use `java.io.ObjectOutputStream` serialization
 (accepting its [native image quirks](https://www.graalvm.org/latest/reference-manual/native-image/metadata/#serialization))
 or via a dedicated library automatically generating the necessary code
 (TBD to provide a link).
@@ -66,13 +66,13 @@ or via a dedicated library automatically generating the necessary code
 The magic of executing code in the _"other JVM"_ is handled by
 [Channel.execute](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/org.apidesign.jvm.channel/org/apidesign/jvm/channel/Channel.html#execute(java.lang.Class,java.util.function.Function))
 method. It takes a `Function`, serializes it, sends it over the channel
-and evaluates it in the other JVM. The API doesn't prescribe how the function
+and **synchronously evaluates** it in the other JVM. The API doesn't prescribe how the function
 should look like, but it is generally recommended to make it a `record`:
 
 ```java
-record RequestFactorial(String number) implements Function<Channel<?>, Void> {
+record RequestFactorial(String number) implements Function<Channel<SerdeConf>, ReportResult> {
     @Override
-    public ReportResult apply(Channel<?> channel) {
+    public ReportResult apply(Channel<SerdeConf> channel) {
         var n = Long.parseLong(number);
         var acc = BigInteger.ONE;
         for (var i = 1l; i <= n; i++) {
@@ -88,7 +88,7 @@ Then the serde is simple: just serialize all the `record` constructor arguments
 one by one and read them back when deserializing. The function accepts a
 [Channel](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/org.apidesign.jvm.channel/org/apidesign/jvm/channel/Channel.html)
 argument and thus it can communicate back with the JVM that originated the request
-establishing fully duplex communication. Once a `apply` method is finished, the
+establishing fully **duplex communication**. Once a `apply` method is finished, the
 result is then returned to the calling JVM (again via serialization and deserialization).
 
 ```java
