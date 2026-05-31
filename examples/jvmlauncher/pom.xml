@@ -29,7 +29,8 @@
     <name>Example: Launch 2nd JVM</name>
 
     <properties>
-        <exec.mainClass>org.apidesign.demo.jvmlauncher.LaunchJvm</exec.mainClass>
+        <moduleName>org.apidesign.demo.jvmlauncher</moduleName>
+        <exec.mainClass>${moduleName}.LaunchJvm</exec.mainClass>
         <repoDir>../..</repoDir>
         <skipTests>true</skipTests>
     </properties>

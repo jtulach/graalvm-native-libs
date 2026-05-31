@@ -29,7 +29,8 @@
     <name>Example: Channel Between JVMs</name>
 
     <properties>
-        <exec.mainClass>org.apidesign.demo.jvmchannel.FactorialViaChannel</exec.mainClass>
+        <moduleName>org.apidesign.demo.jvmchannel</moduleName>
+        <exec.mainClass>${moduleName}.FactorialViaChannel</exec.mainClass>
         <repoDir>../..</repoDir>
         <skipTests>true</skipTests>
     </properties>
@@ -50,7 +51,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <source>25</source>
-                    <target>8</target>
+                    <target>25</target>
                 </configuration>
             </plugin>
             <plugin>
