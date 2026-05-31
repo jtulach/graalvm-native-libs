@@ -60,5 +60,16 @@ The previous example just launched second JVM in the same process and launched a
 main class in the HotSpot JVM. There was no additional communication between the two JVMs since them.
 That's OK for a simple launcher scenario, but for more intricate use-cases some communication may be needed.
 
+```java
+var jvm = JVM.create(javaDir, "-Djava.class.path=.");
+var ch = Channel.create(jvm, SerdeConf.class);
+var res = ch.execute(ReportResult.class, new RequestFactorial(5));
+System.out.println("fac(5) = " + res.result());
+```
+
 That's why this project supports exchange of messages between the JVMs launched via the `JVM` class. Just use the
-[Channel class](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/). Details are coming...
+[Channel class](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/).
+Define your own custom messages like `RequestFactorial` and responses like `ReportResult`
+and exchange them between the JVMs!
+Details are available in a [separate document](examples/jvmchannel/README.md)
+including a sample project to execute.
