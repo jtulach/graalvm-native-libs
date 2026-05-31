@@ -15,7 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         java: [ '25' ]
-        os: [ ubuntu-24.04, macos-14, windows-2022 ]
+        os: [ ubuntu-24.04, macos-14 ] 
+        # windows-2022 disabled because of 
+        # https://github.com/jtulach/graalvm-native-libs/pull/3#issuecomment-4585601488
 
     steps:
     - uses: actions/checkout@v4
