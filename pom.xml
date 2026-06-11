@@ -157,6 +157,21 @@
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
                         <version>3.5.1</version>
+                        <executions>
+                            <execution>
+                                <id>load-print-class</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <arg>${project.build.directory}/classes</arg>
+                                        <arg>org.apidesign.demo.Print</arg>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
                         <configuration>
                             <executable>${project.build.directory}/${project.name}</executable>
                         </configuration>
