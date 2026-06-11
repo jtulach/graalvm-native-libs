@@ -145,6 +145,12 @@
                             </execution>
                         </executions>
                         <configuration>
+                            <buildArgs>
+                                <arg>-H:+RuntimeClassLoading</arg>
+                                <arg>-H:+AllowJRTFileSystem</arg>
+                                <arg>-H:Preserve=package=java.lang</arg>
+                                <arg>-H:Preserve=package=java.security</arg>
+                            </buildArgs>
                         </configuration>
                     </plugin>
                     <plugin>
