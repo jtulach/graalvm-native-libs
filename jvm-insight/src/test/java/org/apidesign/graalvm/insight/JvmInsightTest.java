@@ -116,7 +116,27 @@ public class JvmInsightTest {
         Line 25 with n=3
         Line 25 with n=4
         Line 25 with n=5
-        """, out.toString(), "Properly captured five invocation of fac(n)");
+        """, out.toString(), "Properly captured stepping thru the fac function");
+    }
+
+    @Test
+    public void noExpressionsInEspresso() throws Exception {
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                print(`Line ${ctx.line} with n=${frame.n}`);
+            }, {
+                expressions : true,
+                rootNameFilter : '.*fac.*'
+            });
+            """;
+        try (
+            var _ = applyInsight(ctx, insight, "print-lines.js")
+        ) {
+            var res = Factorial.invokeMember("fac", 5);
+            assertEquals(120, res.asLong());
+        }
+
+        assertEquals("", out.toString(), "Expressions aren't supported by Espresso");
     }
 
     private static AutoCloseable applyInsight(Context ctx, String code, String name)
