@@ -21,7 +21,8 @@ public class Factorial {
         if (n <= 1) {
             return 1;
         } else {
-            return n * fac(n - 1);
+            var n1 = fac(n - 1);
+            return n * n1;
         }
     }
     

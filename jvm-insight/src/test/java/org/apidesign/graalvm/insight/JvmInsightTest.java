@@ -19,22 +19,47 @@ import java.io.IOException;
 import java.util.function.Function;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.Value;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 
 public class JvmInsightTest {
+    private static ByteArrayOutputStream out;
+    private static Context ctx;
+    private static Value Factorial;
+
     public JvmInsightTest() {
     }
 
-    @Test
-    public void invokeFactorialWithInsights() throws Exception {
-        var out = new ByteArrayOutputStream();
+    @BeforeAll
+    public static void initializeContext() throws Exception {
+        out = new ByteArrayOutputStream();
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
         var b = Context.newBuilder("js", "java")
                 .option("java.Classpath", new File(cp.toURI()).getAbsolutePath())
                 .out(out)
                 .allowNativeAccess(true);
+        ctx = b.build();
+        ctx.enter();
+        Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
+        assertNotNull(Factorial, "Class is found");
+    }
 
+    @AfterAll
+    public static void disposeContext() {
+        ctx.close();
+    }
+
+    @BeforeEach
+    public void clearThePreviousOutput() {
+        out.reset();
+    }
+
+    @Test
+    public void invokeFactorialWithInsights() throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 print(`Invoked ${ctx.name} with n=${frame.n}`);
@@ -44,11 +69,8 @@ public class JvmInsightTest {
             });
             """;
         try (
-            var ctx = b.build();
             var _ = applyInsight(ctx, insight, "print-n.js")
         ) {
-            var Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
-            assertNotNull(Factorial, "Class is found");
             var res = Factorial.invokeMember("fac", 5);
             assertEquals(120, res.asLong());
         }
@@ -59,6 +81,41 @@ public class JvmInsightTest {
         Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=3
         Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=2
         Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=1
+        """, out.toString(), "Properly captured five invocation of fac(n)");
+    }
+
+    @Test
+    public void trackStatementsEgLines() throws Exception {
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                print(`Line ${ctx.line} with n=${frame.n}`);
+            }, {
+                statements : true,
+                rootNameFilter : '.*fac.*'
+            });
+            """;
+        try (
+            var _ = applyInsight(ctx, insight, "print-lines.js")
+        ) {
+            var res = Factorial.invokeMember("fac", 5);
+            assertEquals(120, res.asLong());
+        }
+
+        assertEquals("""
+        Line 21 with n=5
+        Line 24 with n=5
+        Line 21 with n=4
+        Line 24 with n=4
+        Line 21 with n=3
+        Line 24 with n=3
+        Line 21 with n=2
+        Line 24 with n=2
+        Line 21 with n=1
+        Line 22 with n=1
+        Line 25 with n=2
+        Line 25 with n=3
+        Line 25 with n=4
+        Line 25 with n=5
         """, out.toString(), "Properly captured five invocation of fac(n)");
     }
 
