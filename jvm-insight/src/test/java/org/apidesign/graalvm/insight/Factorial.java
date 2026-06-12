@@ -13,7 +13,16 @@
  */
 package org.apidesign.graalvm.insight;
 
-public final class JvmInsight {
-    private JvmInsight() {
+public class Factorial {
+    private Factorial() {
     }
+
+    public static int fac(int n) {
+        if (n <= 1) {
+            return 1;
+        } else {
+            return n * fac(n - 1);
+        }
+    }
+    
 }

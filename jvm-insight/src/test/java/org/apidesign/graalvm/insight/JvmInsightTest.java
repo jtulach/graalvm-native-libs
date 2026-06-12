@@ -13,6 +13,7 @@
  */
 package org.apidesign.graalvm.insight;
 
+import java.io.File;
 import org.graalvm.polyglot.Context;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,13 +23,16 @@ public class JvmInsightTest {
     }
 
     @Test
-    public void testMain() {
+    public void testMain() throws Exception {
+        var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
         var b = Context.newBuilder("js", "java")
+                .option("java.Classpath", new File(cp.toURI()).getAbsolutePath())
                 .allowNativeAccess(true);
         try (var ctx = b.build()) {
-            var Long = ctx.getBindings("java").getMember("java.lang.Long");
-            var res = Long.invokeMember("parseLong", "333");
-            assertEquals(333, res.asLong());
+            var Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
+            assertNotNull(Factorial, "Class is found");
+            var res = Factorial.invokeMember("fac", 5);
+            assertEquals(120, res.asLong());
         }
     }
 
