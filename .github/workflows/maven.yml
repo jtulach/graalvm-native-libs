@@ -31,4 +31,9 @@ jobs:
     - name: Build Native
       run: mvn -Pnative -B package --file pom.xml
 
+    - name: Exec without class loading
+      run: mvn -q -Pnative exec:exec
+
+    - name: Exec with class loading
+      run: mvn -q -Pnative exec:exec@load-print-class
 
