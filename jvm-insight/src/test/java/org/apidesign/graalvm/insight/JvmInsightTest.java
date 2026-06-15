@@ -21,10 +21,11 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 public class JvmInsightTest {
     private static ByteArrayOutputStream out;
@@ -58,8 +59,9 @@ public class JvmInsightTest {
         out.reset();
     }
 
-    @Test
-    public void invokeFactorialWithInsights() throws Exception {
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void invokeFactorialWithInsights(JvmType jvm) throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 print(`Invoked ${ctx.name} with n=${frame.n}`);
@@ -69,10 +71,10 @@ public class JvmInsightTest {
             });
             """;
         try (
-            var _ = applyInsight(ctx, insight, "print-n.js")
+            var _ = jvm.applyInsight(ctx, insight, "print-n.js")
         ) {
-            var res = Factorial.invokeMember("fac", 5);
-            assertEquals(120, res.asLong());
+            var res = jvm.invokeFactorialMethodLong("fac", 5);
+            assertEquals(120, res);
         }
 
         assertEquals("""
@@ -84,8 +86,9 @@ public class JvmInsightTest {
         """, out.toString(), "Properly captured five invocation of fac(n)");
     }
 
-    @Test
-    public void trackStatementsEgLines() throws Exception {
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void trackStatementsEgLines(JvmType jvm) throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 print(`Line ${ctx.line} with n=${frame.n}`);
@@ -95,10 +98,10 @@ public class JvmInsightTest {
             });
             """;
         try (
-            var _ = applyInsight(ctx, insight, "print-lines.js")
+            var _ = jvm.applyInsight(ctx, insight, "print-lines.js")
         ) {
-            var res = Factorial.invokeMember("fac", 5);
-            assertEquals(120, res.asLong());
+            var res = jvm.invokeFactorialMethodLong("fac", 5);
+            assertEquals(120, res);
         }
 
         assertEquals("""
@@ -119,8 +122,9 @@ public class JvmInsightTest {
         """, out.toString(), "Properly captured stepping thru the fac function");
     }
 
-    @Test
-    public void noExpressionsInEspresso() throws Exception {
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void noExpressionsInEspresso(JvmType jvm) throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 print(`Line ${ctx.line} with n=${frame.n}`);
@@ -130,27 +134,36 @@ public class JvmInsightTest {
             });
             """;
         try (
-            var _ = applyInsight(ctx, insight, "print-lines.js")
+            var _ = jvm.applyInsight(ctx, insight, "print-lines.js")
         ) {
-            var res = Factorial.invokeMember("fac", 5);
-            assertEquals(120, res.asLong());
+            var res = jvm.invokeFactorialMethodLong("fac", 5);
+            assertEquals(120, res);
         }
 
         assertEquals("", out.toString(), "Expressions aren't supported by Espresso");
     }
 
-    private static AutoCloseable applyInsight(Context ctx, String code, String name)
-    throws IOException {
-        var engine = ctx.getEngine();
+    public enum JvmType {
+        ESPRESSO // , JVM
+        ;
 
-        var insight = engine.getInstruments().get("insight");
-        assertNotNull(insight, "There must be an insight instrument");
+        final AutoCloseable applyInsight(Context ctx, String code, String name)
+                throws IOException {
+            var engine = ctx.getEngine();
 
-        @SuppressWarnings("unchecked")
-        var fn = (Function<Source, AutoCloseable>) insight.lookup(Function.class);
-        assertNotNull(fn, "There must be an insight registraiton function");
+            var insight = engine.getInstruments().get("insight");
+            assertNotNull(insight, "There must be an insight instrument");
 
-        var insightScript = Source.newBuilder("js", code, name).build();
-        return fn.apply(insightScript);
+            @SuppressWarnings("unchecked")
+            var fn = (Function<Source, AutoCloseable>) insight.lookup(Function.class);
+            assertNotNull(fn, "There must be an insight registraiton function");
+
+            var insightScript = Source.newBuilder("js", code, name).build();
+            return fn.apply(insightScript);
+        }
+        
+        final long invokeFactorialMethodLong(String name, Object... args) {
+            return Factorial.invokeMember(name, args).asLong();
+        }
     }
 }
