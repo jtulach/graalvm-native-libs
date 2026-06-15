@@ -15,11 +15,13 @@ package org.apidesign.graalvm.insight;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
+import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.stream.Stream;
+import java.util.regex.Pattern;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterAll;
@@ -42,9 +44,15 @@ public class JvmInsightTest {
     public static void initializeContext() throws Exception {
         out = new ByteArrayOutputStream();
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
+        final HostAccess hostAccess = HostAccess.newBuilder()
+                .allowAccessAnnotatedBy(HostAccess.Export.class)
+                .allowImplementationsAnnotatedBy(FunctionalInterface.class)
+                .allowMapAccess(true)
+                .build();
         var b = Context.newBuilder("js", "java")
                 .option("java.Classpath", new File(cp.toURI()).getAbsolutePath())
                 .out(out)
+                .allowHostAccess(hostAccess)
                 .allowNativeAccess(true);
         ctx = b.build();
         ctx.enter();
@@ -153,14 +161,53 @@ public class JvmInsightTest {
     public enum JvmType {
         ESPRESSO, JVM;
 
+        public static final class Insight {
+            private Insight() {
+            }
+
+            public static class Ctx {
+                @HostAccess.Export
+                public final String name;
+
+                private Ctx(String name) {
+                    this.name = name;
+                }
+            }
+
+            @HostAccess.Export
+            public void on(String type, BiFunction<Object, Object, Object> fn, Map<String,Object> cfg)
+            throws Exception {
+                var filter = (String) cfg.get("rootNameFilter");
+                var rootNameFilter = filter == null ? null : Pattern.compile(filter);
+                System.err.println("type: " + type + " fn: " + fn + " cfg: " + cfg);
+                var f = FactorialHosted.getField("TRACE");
+                f.set(null, (BiConsumer<?, ?>) (String methodName, Map<String,Object> frame) -> {
+                    if (rootNameFilter == null || rootNameFilter.matcher(methodName).matches()) {
+                        var ctx = new Ctx(methodName);
+                        fn.apply(ctx, frame);
+                    }
+                    System.err.println("tracing method enter: " + methodName + " with " + frame);
+                });
+            }
+        }
+
         final AutoCloseable applyInsight(Context ctx, String code, String name)
                 throws Exception {
             if (this == JVM) {
-                var f = FactorialHosted.getField("TRACE");
-                f.set(null, (BiConsumer<String, Object>) (String methodName, Object u) -> {
-                    System.err.println("tracing method enter: " + methodName + " with " + u);
-                });
+                var init = """
+                (function(insight) {
+                    return function(code) {
+                        return eval(code);
+                    }
+                })
+                """;
+                var initFn = ctx.eval("js", init);
+                var insight = new Insight();
+                var evalFn = initFn.execute(insight);
+                evalFn.executeVoid(code);
+
                 return () -> {
+                    var f = FactorialHosted.getField("TRACE");
                     f.set(null, null);
                 };
             }

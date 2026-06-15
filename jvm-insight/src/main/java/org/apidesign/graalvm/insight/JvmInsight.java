@@ -16,9 +16,6 @@ package org.apidesign.graalvm.insight;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.classfile.AccessFlags;
-import java.lang.classfile.AttributeMapper;
-import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassFile;
@@ -26,16 +23,13 @@ import java.lang.classfile.ClassModel;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.CodeModel;
-import java.lang.classfile.CodeTransform;
-import java.lang.classfile.FieldModel;
 import java.lang.classfile.Label;
-import java.lang.classfile.MethodElement;
 import java.lang.classfile.MethodModel;
-import java.lang.classfile.MethodTransform;
-import java.lang.classfile.attribute.LocalVariableTableAttribute;
+import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.instruction.LocalVariable;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
@@ -129,7 +123,7 @@ public final class JvmInsight extends URLClassLoader {
                                 if (instr instanceof Label label) {
                                     System.err.println("     label: " + label);
                                     if (!enterGenerated) {
-                                        enterMethod(method.methodName().stringValue(), locals.values(), cb);
+                                        enterMethod(method, locals.values(), cb);
                                         enterGenerated = true;
                                     }
                                     var it = localTypes.entrySet().iterator();
@@ -152,12 +146,12 @@ public final class JvmInsight extends URLClassLoader {
             }
         }
 
-        private void enterMethod(String methodName, Collection<LocalVariable> locals, CodeBuilder cb) {
+        private void enterMethod(MethodModel method, Collection<LocalVariable> locals, CodeBuilder cb) {
             cb.getstatic(model.thisClass().asSymbol(), "TRACE", callbackClass);
             var noCallback = cb.newLabel();
             cb.ifnull(noCallback);
             cb.getstatic(model.thisClass().asSymbol(), "TRACE", callbackClass);
-            cb.loadConstant(methodName);
+            cb.loadConstant(fqn(model.thisClass(), method));
             for (var l : locals) {
                 cb.loadConstant(l.name().stringValue());
                 loadObjectWraper(cb, l);
@@ -180,6 +174,10 @@ public final class JvmInsight extends URLClassLoader {
             } else {
                 cb.aload(l.slot());
             }
+        }
+
+        private ConstantDesc fqn(ClassEntry clazz, MethodModel method) {
+            return "L" + clazz.asInternalName() + ";." + method.methodName() + method.methodTypeSymbol().descriptorString();
         }
 
     }
