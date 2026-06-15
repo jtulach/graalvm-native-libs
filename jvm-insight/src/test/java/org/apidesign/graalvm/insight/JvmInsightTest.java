@@ -17,6 +17,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -31,6 +32,7 @@ public class JvmInsightTest {
     private static ByteArrayOutputStream out;
     private static Context ctx;
     private static Value Factorial;
+    private static Class<?> FactorialHosted;
 
     public JvmInsightTest() {
     }
@@ -47,6 +49,10 @@ public class JvmInsightTest {
         ctx.enter();
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
+
+        var loader = new JvmInsight(Factorial.class.getClassLoader().getParent(), cp);
+        FactorialHosted = loader.loadClass(Factorial.class.getName());
+        assertNotNull(FactorialHosted, "Factorial class is loaded");
     }
 
     @AfterAll
@@ -144,8 +150,7 @@ public class JvmInsightTest {
     }
 
     public enum JvmType {
-        ESPRESSO // , JVM
-        ;
+        ESPRESSO, JVM;
 
         final AutoCloseable applyInsight(Context ctx, String code, String name)
                 throws IOException {
@@ -161,9 +166,19 @@ public class JvmInsightTest {
             var insightScript = Source.newBuilder("js", code, name).build();
             return fn.apply(insightScript);
         }
-        
+
         final long invokeFactorialMethodLong(String name, Object... args) {
-            return Factorial.invokeMember(name, args).asLong();
+            return switch (this) {
+                case ESPRESSO -> Factorial.invokeMember(name, args).asLong();
+                case JVM -> {
+                    try {
+                        var value = FactorialHosted.getMethod(name, int.class).invoke(null, args);
+                        yield ((Number) value).longValue();
+                    } catch (ReflectiveOperationException ex) {
+                        throw new IllegalStateException(ex);
+                    }
+                }
+            };
         }
     }
 }
