@@ -16,6 +16,7 @@ package org.apidesign.graalvm.insight;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.graalvm.polyglot.Context;
@@ -153,7 +154,16 @@ public class JvmInsightTest {
         ESPRESSO, JVM;
 
         final AutoCloseable applyInsight(Context ctx, String code, String name)
-                throws IOException {
+                throws Exception {
+            if (this == JVM) {
+                var f = FactorialHosted.getField("TRACE");
+                f.set(null, (BiConsumer<String, Object>) (String methodName, Object u) -> {
+                    System.err.println("tracing method enter: " + methodName + " with " + u);
+                });
+                return () -> {
+                    f.set(null, null);
+                };
+            }
             var engine = ctx.getEngine();
 
             var insight = engine.getInstruments().get("insight");

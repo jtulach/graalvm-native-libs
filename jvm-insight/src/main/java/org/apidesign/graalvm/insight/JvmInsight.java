@@ -14,6 +14,7 @@
 package org.apidesign.graalvm.insight;
 
 import java.io.IOException;
+import java.lang.classfile.AccessFlags;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassFile;
@@ -21,10 +22,14 @@ import java.lang.classfile.ClassModel;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.CodeModel;
 import java.lang.classfile.CodeTransform;
+import java.lang.classfile.FieldModel;
 import java.lang.classfile.MethodElement;
 import java.lang.classfile.MethodModel;
 import java.lang.classfile.MethodTransform;
+import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
+import java.lang.constant.MethodTypeDesc;
+import java.lang.reflect.AccessFlag;
 import java.net.URL;
 import java.net.URLClassLoader;
 
@@ -55,16 +60,46 @@ public final class JvmInsight extends URLClassLoader {
 
     private byte[] patch(byte[] arr) {
         var model = clazzFile.parse(arr);
-        return clazzFile.transformClass(model, new Samsa());
+        return clazzFile.transformClass(model, new Samsa(model));
     }
 
     private static final class Samsa implements ClassTransform {
+        private ClassModel model;
+        private boolean field;
+        private final ClassDesc callbackClass;
+
+        public Samsa(ClassModel clazz) {
+            this.model = clazz;
+            this.callbackClass = ClassDesc.of("java.util.function.BiConsumer");
+        }
+
         @Override
         public void accept(ClassBuilder builder, ClassElement element) {
+            if (!field) {
+                field = true;
+                builder.withField("TRACE", callbackClass, AccessFlag.PUBLIC.mask() | AccessFlag.STATIC.mask());
+            }
+
             if (element instanceof MethodModel method) {
                 builder.transformMethod(method, (mb, me) -> {
-                    System.err.println("rewriting " + method.methodName() + " " + me);
-                    mb.with(me);
+                    if (me instanceof CodeModel code) {
+                        mb.withCode((cb) -> {
+                            cb.getstatic(model.thisClass().asSymbol(), "TRACE", callbackClass);
+                            var noCallback = cb.newLabel();
+                            cb.ifnull(noCallback);
+                            cb.getstatic(model.thisClass().asSymbol(), "TRACE", callbackClass);
+                            cb.loadConstant(method.methodName().stringValue());
+                            cb.aconst_null();
+                            var consumeType = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object, ConstantDescs.CD_Object);
+                            cb.invokeinterface(callbackClass, "accept", consumeType);
+                            cb.labelBinding(noCallback);
+                            for (var instr : code.elementList()) {
+                                cb.with(instr);
+                            }
+                        });
+                    } else {
+                        mb.with(me);
+                    }
                 });
             } else {
                 builder.with(element);
