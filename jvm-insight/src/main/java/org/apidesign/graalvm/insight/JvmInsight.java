@@ -107,6 +107,13 @@ public final class JvmInsight extends URLClassLoader {
                                 cb.with(instr);
                                 System.err.println("  instr: " + instr);
                                 if (instr instanceof LocalVariable localVar) {
+                                    if (
+                                        localVar.typeSymbol() == ConstantDescs.CD_long
+                                        || localVar.typeSymbol() == ConstantDescs.CD_double
+                                    ) {
+                                        // long and double vars occupy two slots
+                                        count++;
+                                    }
                                     localTypes.put(localVar.slot(), localVar);
                                     if (!localVar.name().equalsString("this")
                                     ) {
@@ -167,10 +174,49 @@ public final class JvmInsight extends URLClassLoader {
         private void loadObjectWraper(CodeBuilder cb, LocalVariable l) {
             System.err.println("variable name " + l.name() + " at: " + l.slot() + " type: " + l.typeSymbol() + " p: " + l.typeSymbol().isPrimitive());
             if (l.typeSymbol().isPrimitive()) {
-                cb.iload(l.slot());
-                System.err.println("converting primitive type: " + l.typeSymbol());
-                var type = MethodTypeDesc.of(ConstantDescs.CD_Integer, ConstantDescs.CD_int);
-                cb.invokestatic(ConstantDescs.CD_Integer, "valueOf", type);
+                switch (l.typeSymbol().descriptorString()) {
+                    case "Z" -> {
+                        cb.iload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
+                        cb.invokestatic(ConstantDescs.CD_Boolean, "valueOf", type);
+                    }
+                    case "B" -> {
+                        cb.iload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Byte, ConstantDescs.CD_byte);
+                        cb.invokestatic(ConstantDescs.CD_Byte, "valueOf", type);
+                    }
+                    case "C" -> {
+                        cb.iload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Character, ConstantDescs.CD_char);
+                        cb.invokestatic(ConstantDescs.CD_Character, "valueOf", type);
+                    }
+                    case "S" -> {
+                        cb.iload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Short, ConstantDescs.CD_short);
+                        cb.invokestatic(ConstantDescs.CD_Short, "valueOf", type);
+                    }
+                    case "I" -> {
+                        cb.iload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Integer, ConstantDescs.CD_int);
+                        cb.invokestatic(ConstantDescs.CD_Integer, "valueOf", type);
+                    }
+                    case "J" -> {
+                        cb.lload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Long, ConstantDescs.CD_long);
+                        cb.invokestatic(ConstantDescs.CD_Long, "valueOf", type);
+                    }
+                    case "F" -> {
+                        cb.fload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Float, ConstantDescs.CD_float);
+                        cb.invokestatic(ConstantDescs.CD_Float, "valueOf", type);
+                    }
+                    case "D" -> {
+                        cb.dload(l.slot());
+                        var type = MethodTypeDesc.of(ConstantDescs.CD_Double, ConstantDescs.CD_double);
+                        cb.invokestatic(ConstantDescs.CD_Double, "valueOf", type);
+                    }
+                    default -> throw new IllegalStateException("Unknown descriptor: " + l.typeSymbol().descriptorString());
+                }
             } else {
                 cb.aload(l.slot());
             }

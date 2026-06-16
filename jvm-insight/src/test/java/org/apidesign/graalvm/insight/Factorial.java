@@ -25,5 +25,14 @@ public class Factorial {
             return n * n1;
         }
     }
-    
+
+    public static int allTypes(
+        String prefix,
+        boolean type_z, byte type_b, short type_s,
+        int type_i, long type_l, char type_c,
+        float type_f, double type_d
+    ) {
+        var txt = prefix + type_z + type_b + type_s + type_i + type_l + type_c + type_f + type_d;
+        return txt.length();
+    }
 }

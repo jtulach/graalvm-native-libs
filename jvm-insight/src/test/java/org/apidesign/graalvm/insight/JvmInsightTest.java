@@ -16,6 +16,7 @@ package org.apidesign.graalvm.insight;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -158,6 +159,44 @@ public class JvmInsightTest {
         assertEquals("", out.toString(), "Expressions aren't supported by Espresso");
     }
 
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void testLocalVariableTypes(JvmType jvm) throws Exception {
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                let sb = "";
+                let sep = "";
+                for (let p in frame) {
+                    if (p.startsWith("type_")) {
+                        sb = sb + sep + p + ":" + frame[p];
+                        sep = ","
+                    }
+                }
+                print(sb);
+            }, {
+                roots : true,
+                rootNameFilter : '.*allTypes.*'
+            });
+            """;
+        long len;
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "all-types.js")
+        ) {
+            len = jvm.invokeFactorialMethodLong("allTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
+        }
+
+        var exp = Set.of(
+            "type_z:false", "type_b:4", "type_s:32", "type_i:48",
+            "type_l:6354", "type_c:X", "type_f:0.5", "type_d:2.7"
+        );
+        var act = Set.of(out.toString().trim().split(","));
+        assertEquals(exp, act, "Properly captured all arguments");
+        var allLen = exp.stream().map(s -> {
+            return s.split(":")[1].length();
+        }).reduce(0, (a, b) -> a + b);
+        assertEquals(allLen.intValue(), len, "Computed length is the same");
+    }
+
     public enum JvmType {
         ESPRESSO, JVM;
 
@@ -229,8 +268,14 @@ public class JvmInsightTest {
                 case ESPRESSO -> Factorial.invokeMember(name, args).asLong();
                 case JVM -> {
                     try {
-                        var value = FactorialHosted.getMethod(name, int.class).invoke(null, args);
-                        yield ((Number) value).longValue();
+                        for (var m : FactorialHosted.getMethods()) {
+                            if (!m.getName().equals(name)) {
+                                continue;
+                            }
+                            var value = m.invoke(null, args);
+                            yield ((Number) value).longValue();
+                        }
+                        throw new IllegalStateException("Cannot find " + name);
                     } catch (ReflectiveOperationException ex) {
                         throw new IllegalStateException(ex);
                     }
