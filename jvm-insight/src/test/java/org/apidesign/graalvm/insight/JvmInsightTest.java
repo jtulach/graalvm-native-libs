@@ -207,9 +207,12 @@ public class JvmInsightTest {
             public static class Ctx {
                 @HostAccess.Export
                 public final String name;
+                @HostAccess.Export
+                public final int line;
 
-                private Ctx(String name) {
+                private Ctx(String name, int line) {
                     this.name = name;
+                    this.line = line;
                 }
             }
 
@@ -218,15 +221,23 @@ public class JvmInsightTest {
             throws Exception {
                 var filter = (String) cfg.get("rootNameFilter");
                 var rootNameFilter = filter == null ? null : Pattern.compile(filter);
-                System.err.println("type: " + type + " fn: " + fn + " cfg: " + cfg);
-                var f = FactorialHosted.getField("TRACE");
-                f.set(null, (BiConsumer<?, ?>) (String methodName, Map<String,Object> frame) -> {
+                final BiConsumer<String, Map<String, Object>> handler = (String where, Map<String,Object> frame) -> {
+                    var lineSep = where.indexOf(':');
+                    var line = Integer.parseInt(where.substring(0, lineSep));
+                    var methodName = where.substring(lineSep + 1);
                     if (rootNameFilter == null || rootNameFilter.matcher(methodName).matches()) {
-                        var ctx = new Ctx(methodName);
+                        var ctx = new Ctx(methodName, line);
                         fn.apply(ctx, frame);
                     }
-                    System.err.println("tracing method enter: " + methodName + " with " + frame);
-                });
+                };
+                if (Boolean.TRUE.equals(cfg.get("roots"))) {
+                    var f = FactorialHosted.getField("ROOTS");
+                    f.set(null, handler);
+                }
+                if (Boolean.TRUE.equals(cfg.get("statements"))) {
+                    var f = FactorialHosted.getField("STATEMENTS");
+                    f.set(null, handler);
+                }
             }
         }
 
@@ -246,8 +257,10 @@ public class JvmInsightTest {
                 evalFn.executeVoid(code);
 
                 return () -> {
-                    var f = FactorialHosted.getField("TRACE");
-                    f.set(null, null);
+                    var roots = FactorialHosted.getField("ROOTS");
+                    roots.set(null, null);
+                    var statements = FactorialHosted.getField("STATEMENTS");
+                    statements.set(null, null);
                 };
             }
             var engine = ctx.getEngine();

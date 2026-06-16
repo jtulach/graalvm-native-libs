@@ -26,6 +26,7 @@ import java.lang.classfile.CodeModel;
 import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
 import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LocalVariable;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
@@ -88,12 +89,12 @@ public final class JvmInsight extends URLClassLoader {
         public void accept(ClassBuilder builder, ClassElement element) {
             if (!field) {
                 field = true;
-                builder.withField("TRACE", callbackClass, AccessFlag.PUBLIC.mask() | AccessFlag.STATIC.mask());
+                builder.withField("ROOTS", callbackClass, AccessFlag.PUBLIC.mask() | AccessFlag.STATIC.mask());
+                builder.withField("STATEMENTS", callbackClass, AccessFlag.PUBLIC.mask() | AccessFlag.STATIC.mask());
             }
 
             if (element instanceof MethodModel method) {
                 builder.transformMethod(method, (mb, me) -> {
-                    System.err.println("me: " + me.getClass());
                     if (me instanceof CodeModel code) {
                         mb.withCode((cb) -> {
                             var count = method.methodTypeSymbol().parameterCount();
@@ -105,7 +106,7 @@ public final class JvmInsight extends URLClassLoader {
                             var locals = new HashMap<Integer, LocalVariable>();
                             for (var instr : code.elementList()) {
                                 cb.with(instr);
-                                System.err.println("  instr: " + instr);
+                                // System.err.println("  instr: " + instr);
                                 if (instr instanceof LocalVariable localVar) {
                                     if (
                                         localVar.typeSymbol() == ConstantDescs.CD_long
@@ -121,16 +122,14 @@ public final class JvmInsight extends URLClassLoader {
                                             locals.put(localVar.slot(), localVar);
                                         }
                                     }
-                                    System.err.println("     defined var until: " + localVar.endScope());
                                 }
                                 if (instr instanceof StoreInstruction store) {
                                     var initializedVar = localTypes.get(store.slot());
                                     locals.put(store.slot(), initializedVar);
                                 }
                                 if (instr instanceof Label label) {
-                                    System.err.println("     label: " + label);
                                     if (!enterGenerated) {
-                                        enterMethod(method, locals.values(), cb);
+                                        onEnter("ROOTS", method, -1, locals.values(), cb);
                                         enterGenerated = true;
                                     }
                                     var it = localTypes.entrySet().iterator();
@@ -141,6 +140,9 @@ public final class JvmInsight extends URLClassLoader {
                                             locals.remove(en.getKey());
                                         }
                                     }
+                                }
+                                if (instr instanceof LineNumber line) {
+                                    onEnter("STATEMENTS", method, line.line(), locals.values(), cb);
                                 }
                             }
                         });
@@ -153,12 +155,12 @@ public final class JvmInsight extends URLClassLoader {
             }
         }
 
-        private void enterMethod(MethodModel method, Collection<LocalVariable> locals, CodeBuilder cb) {
-            cb.getstatic(model.thisClass().asSymbol(), "TRACE", callbackClass);
+        private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariable> locals, CodeBuilder cb) {
+            cb.getstatic(model.thisClass().asSymbol(), fieldName, callbackClass);
             var noCallback = cb.newLabel();
             cb.ifnull(noCallback);
-            cb.getstatic(model.thisClass().asSymbol(), "TRACE", callbackClass);
-            cb.loadConstant(fqn(model.thisClass(), method));
+            cb.getstatic(model.thisClass().asSymbol(), fieldName, callbackClass);
+            cb.loadConstant(fqn(model.thisClass(), method, line));
             for (var l : locals) {
                 cb.loadConstant(l.name().stringValue());
                 loadObjectWraper(cb, l);
@@ -172,7 +174,6 @@ public final class JvmInsight extends URLClassLoader {
         }
 
         private void loadObjectWraper(CodeBuilder cb, LocalVariable l) {
-            System.err.println("variable name " + l.name() + " at: " + l.slot() + " type: " + l.typeSymbol() + " p: " + l.typeSymbol().isPrimitive());
             if (l.typeSymbol().isPrimitive()) {
                 switch (l.typeSymbol().descriptorString()) {
                     case "Z" -> {
@@ -222,8 +223,9 @@ public final class JvmInsight extends URLClassLoader {
             }
         }
 
-        private ConstantDesc fqn(ClassEntry clazz, MethodModel method) {
-            return "L" + clazz.asInternalName() + ";." + method.methodName() + method.methodTypeSymbol().descriptorString();
+        private ConstantDesc fqn(ClassEntry clazz, MethodModel method, int line) {
+            var methodName = "L" + clazz.asInternalName() + ";." + method.methodName() + method.methodTypeSymbol().descriptorString();
+            return "" + line + ":" + methodName;
         }
 
     }
