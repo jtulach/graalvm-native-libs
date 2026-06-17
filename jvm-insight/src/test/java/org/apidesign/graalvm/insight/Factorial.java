@@ -35,4 +35,17 @@ public class Factorial {
         var txt = prefix + type_z + type_b + type_s + type_i + type_l + type_c + type_f + type_d;
         return txt.length();
     }
+
+    public static int callsite() {
+        return -1;
+    }
+
+    private static java.lang.invoke.CallSite meaningBootstrap(
+        java.lang.invoke.MethodHandles.Lookup lkp,
+        String name,
+        java.lang.invoke.MethodType t
+    ) {
+        var target = java.lang.invoke.MethodHandles.constant(int.class, 42);
+        return new java.lang.invoke.ConstantCallSite(target);
+    }
 }

@@ -29,6 +29,7 @@ import org.junit.jupiter.api.AfterAll;
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -196,6 +197,13 @@ public class JvmInsightTest {
         }).reduce(0, (a, b) -> a + b);
         assertEquals(allLen.intValue(), len, "Computed length is the same");
     }
+
+    @Test
+    public void testCallsite() throws Exception {
+        var number = (Number)FactorialHosted.getMethod("callsite").invoke(null);
+        assertEquals(42, number.intValue());
+    }
+
 
     public enum JvmType {
         ESPRESSO, JVM;

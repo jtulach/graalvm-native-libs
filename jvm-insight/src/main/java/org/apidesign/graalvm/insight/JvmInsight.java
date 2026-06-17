@@ -32,6 +32,7 @@ import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDesc;
 import java.lang.constant.ConstantDescs;
+import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.net.URL;
@@ -94,6 +95,23 @@ public final class JvmInsight extends URLClassLoader {
             }
 
             if (element instanceof MethodModel method) {
+                if (method.methodName().equalsString("callsite")) {
+                    builder.transformMethod(method, (mb, me) -> {
+                        if (me instanceof CodeModel code) {
+                            mb.withCode((cb) -> {
+                                var clazz = model.thisClass().asSymbol();
+                                var boot = ConstantDescs.ofCallsiteBootstrap(clazz, "meaningBootstrap", ConstantDescs.CD_CallSite);
+                                var ref = DynamicCallSiteDesc.of(boot, MethodTypeDesc.of(ConstantDescs.CD_int));
+                                cb.invokedynamic(ref);
+                                cb.ireturn();
+                            });
+                        } else {
+                            mb.with(me);
+                        }
+                    });
+                    return;
+                }
+
                 builder.transformMethod(method, (mb, me) -> {
                     if (me instanceof CodeModel code) {
                         mb.withCode((cb) -> {
