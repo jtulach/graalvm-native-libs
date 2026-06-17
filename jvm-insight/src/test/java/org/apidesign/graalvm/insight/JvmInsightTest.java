@@ -15,6 +15,7 @@ package org.apidesign.graalvm.insight;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.net.URL;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -37,6 +38,7 @@ public class JvmInsightTest {
     private static ByteArrayOutputStream out;
     private static Context ctx;
     private static Value Factorial;
+    private static Class<?> JvmInsightHosted;
     private static Class<?> FactorialHosted;
 
     public JvmInsightTest() {
@@ -46,6 +48,10 @@ public class JvmInsightTest {
     public static void initializeContext() throws Exception {
         out = new ByteArrayOutputStream();
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
+        var bothCp = new URL[] {
+            JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
+            cp
+        };
         var hostAccess = HostAccess.newBuilder()
                 .allowAccessAnnotatedBy(HostAccess.Export.class)
                 .allowImplementationsAnnotatedBy(FunctionalInterface.class)
@@ -61,9 +67,11 @@ public class JvmInsightTest {
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
 
-        var loader = new JvmInsightLoader(Factorial.class.getClassLoader().getParent(), cp);
+        var loader = new JvmInsightLoader(Factorial.class.getClassLoader().getParent(), bothCp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotNull(FactorialHosted, "Factorial class is loaded");
+        JvmInsightHosted = loader.loadClass(JvmInsight.class.getName());
+        assertNotNull(JvmInsightHosted, "JvmInsight class is loaded");
     }
 
     @AfterAll
@@ -249,11 +257,11 @@ public class JvmInsightTest {
                     }
                 };
                 if (Boolean.TRUE.equals(cfg.get("roots"))) {
-                    var f = FactorialHosted.getField("ROOTS");
+                    var f = JvmInsightHosted.getField("ROOTS");
                     f.set(null, handler);
                 }
                 if (Boolean.TRUE.equals(cfg.get("statements"))) {
-                    var f = FactorialHosted.getField("STATEMENTS");
+                    var f = JvmInsightHosted.getField("STATEMENTS");
                     f.set(null, handler);
                 }
             }
@@ -275,9 +283,9 @@ public class JvmInsightTest {
                 evalFn.executeVoid(code);
 
                 return () -> {
-                    var roots = FactorialHosted.getField("ROOTS");
+                    var roots = JvmInsightHosted.getField("ROOTS");
                     roots.set(null, null);
-                    var statements = FactorialHosted.getField("STATEMENTS");
+                    var statements = JvmInsightHosted.getField("STATEMENTS");
                     statements.set(null, null);
                 };
             }

@@ -41,7 +41,8 @@ final class JvmInsightLoader extends URLClassLoader {
         }
         try {
             var arr = is.readAllBytes();
-            var newArr = patch(arr);
+            var newArr = slashName.startsWith("org/apidesign/graalvm/insight/JvmInsight") ?
+                    arr: patch(arr);
             try (
                 var os = new FileOutputStream(new File("/tmp/Clazz.class"))
             ) {

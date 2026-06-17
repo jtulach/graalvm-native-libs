@@ -38,9 +38,7 @@ import java.util.HashMap;
 /** Transformer patching byte code to be {@link JvmInsight}-ready.
  */
 final class JvmInsightTransform implements ClassTransform {
-
-    private ClassModel model;
-    private boolean field;
+    private final ClassModel model;
     private final ClassDesc callbackClass;
 
     public JvmInsightTransform(ClassModel clazz) {
@@ -50,11 +48,6 @@ final class JvmInsightTransform implements ClassTransform {
 
     @Override
     public void accept(ClassBuilder builder, ClassElement element) {
-        if (!field) {
-            field = true;
-            builder.withField("ROOTS", callbackClass, AccessFlag.PUBLIC.mask() | AccessFlag.STATIC.mask());
-            builder.withField("STATEMENTS", callbackClass, AccessFlag.PUBLIC.mask() | AccessFlag.STATIC.mask());
-        }
         if (element instanceof MethodModel method) {
             if (method.methodName().equalsString("callsite")) {
                 builder.transformMethod(method, (mb, me) -> {
@@ -130,10 +123,13 @@ final class JvmInsightTransform implements ClassTransform {
     }
 
     private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariable> locals, CodeBuilder cb) {
-        cb.getstatic(model.thisClass().asSymbol(), fieldName, callbackClass);
+        var insightClazz = ClassDesc.of(JvmInsight.class.getName());
+        var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite);
+        var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass));
+        cb.invokedynamic(ref);
         var noCallback = cb.newLabel();
         cb.ifnull(noCallback);
-        cb.getstatic(model.thisClass().asSymbol(), fieldName, callbackClass);
+        cb.invokedynamic(ref);
         cb.loadConstant(fqn(model.thisClass(), method, line));
         for (var l : locals) {
             cb.loadConstant(l.name().stringValue());

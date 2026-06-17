@@ -13,7 +13,44 @@
  */
 package org.apidesign.graalvm.insight;
 
+import java.lang.invoke.CallSite;
+import java.lang.invoke.ConstantCallSite;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.util.Map;
+import java.util.function.BiConsumer;
+
 public final class JvmInsight  {
     private JvmInsight() {
     }
+
+    public static BiConsumer<String, Map<String, Object>> ROOTS;
+    public static BiConsumer<String, Map<String, Object>> STATEMENTS;
+
+    /** Creates a dynamically configurable site for JVM Insight. Used by
+     * bytecode manipulation methods that patch methods to be ready for
+     * {@link JvmInsight}.
+     *
+     * @param lkp lookup to use
+     * @param name name of method
+     * @param type requested method type
+     * @return the callsite
+     * @throw IllegalArgumentException if the {@code name} isn't recognized
+     */
+    public static CallSite metafactory(
+        MethodHandles.Lookup lkp, String name, MethodType type
+    ) {
+        try {
+            var myLkp = MethodHandles.lookup();
+            var handle = switch (name) {
+                case "ROOTS" -> myLkp.findStaticGetter(JvmInsight.class, "ROOTS", BiConsumer.class);
+                case "STATEMENTS" -> myLkp.findStaticGetter(JvmInsight.class, "STATEMENTS", BiConsumer.class);
+                default -> throw new NoSuchFieldException(name);
+            };
+            return new ConstantCallSite(handle);
+        } catch (NoSuchFieldException | IllegalAccessException ex) {
+            throw new IllegalArgumentException(ex);
+        }
+    }
+
 }
