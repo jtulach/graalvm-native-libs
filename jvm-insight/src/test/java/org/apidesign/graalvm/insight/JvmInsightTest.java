@@ -38,7 +38,6 @@ public class JvmInsightTest {
     private static ByteArrayOutputStream out;
     private static Context ctx;
     private static Value Factorial;
-    private static Class<?> JvmInsightHosted;
     private static Class<?> FactorialHosted;
 
     public JvmInsightTest() {
@@ -67,11 +66,10 @@ public class JvmInsightTest {
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
 
-        var loader = new JvmInsightLoader(Factorial.class.getClassLoader().getParent(), bothCp);
+        var loader = new JvmInsightLoader(new AvoidingLoader(Factorial.class), bothCp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
+        assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");
-        JvmInsightHosted = loader.loadClass(JvmInsight.class.getName());
-        assertNotNull(JvmInsightHosted, "JvmInsight class is loaded");
     }
 
     @AfterAll
@@ -256,14 +254,9 @@ public class JvmInsightTest {
                         fn.apply(ctx, frame);
                     }
                 };
-                if (Boolean.TRUE.equals(cfg.get("roots"))) {
-                    var f = JvmInsightHosted.getField("ROOTS");
-                    f.set(null, handler);
-                }
-                if (Boolean.TRUE.equals(cfg.get("statements"))) {
-                    var f = JvmInsightHosted.getField("STATEMENTS");
-                    f.set(null, handler);
-                }
+                JvmInsight.apply((insight) -> {
+                   insight.on("enter", handler, cfg);
+                });
             }
         }
 
@@ -278,15 +271,14 @@ public class JvmInsightTest {
                 })
                 """;
                 var initFn = ctx.eval("js", init);
-                var insight = new Insight();
-                var evalFn = initFn.execute(insight);
+                var jvmInsight = new Insight();
+                var evalFn = initFn.execute(jvmInsight);
                 evalFn.executeVoid(code);
 
                 return () -> {
-                    var roots = JvmInsightHosted.getField("ROOTS");
-                    roots.set(null, null);
-                    var statements = JvmInsightHosted.getField("STATEMENTS");
-                    statements.set(null, null);
+                    JvmInsight.apply((insight) -> {
+                       insight.on("enter", null, Map.of("roots", true, "statements", true));
+                    });
                 };
             }
             var engine = ctx.getEngine();
@@ -320,6 +312,23 @@ public class JvmInsightTest {
                     }
                 }
             };
+        }
+    }
+
+    private static final class AvoidingLoader extends ClassLoader {
+        private final Class<?> avoid;
+
+        AvoidingLoader(Class<?> avoid) {
+            super(avoid.getClassLoader());
+            this.avoid = avoid;
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (avoid.getName().equals(name)) {
+                throw new ClassNotFoundException(name);
+            }
+            return super.loadClass(name, resolve);
         }
     }
 }

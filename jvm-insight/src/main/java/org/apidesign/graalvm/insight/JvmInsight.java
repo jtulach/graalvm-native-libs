@@ -19,20 +19,53 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public final class JvmInsight  {
+    private static BiConsumer<String, Map<String, Object>> ROOTS;
+    private static BiConsumer<String, Map<String, Object>> STATEMENTS;
+
     private JvmInsight() {
     }
 
-    public static BiConsumer<String, Map<String, Object>> ROOTS;
-    public static BiConsumer<String, Map<String, Object>> STATEMENTS;
+    /**
+     * Applies new Insights to the running JVM.
+     *
+     * @param block block that receives an instance of {@link JvmInsight}
+     *   and can use it to configure its JVM Insights
+     * @return a handle that can be {@link AutoCloseable#close()} when
+     *   these insights are to be disabled
+     */
+    public static AutoCloseable apply(Consumer<JvmInsight> block) {
+        block.accept(new JvmInsight());
+        return () -> {
+        };
+    }
+
+
+    /** Registers an Insight handler on given type.
+     *
+     * @param type
+     * @param handler
+     * @param cfg
+     */
+    public void on(String type, BiConsumer<String, Map<String, Object>> handler, Map<String, Object> cfg) {
+        if (Boolean.TRUE.equals(cfg.get("roots"))) {
+            ROOTS = handler;
+        }
+        if (Boolean.TRUE.equals(cfg.get("statements"))) {
+            STATEMENTS = handler;
+        }
+    }
+
 
     /** Creates a dynamically configurable site for JVM Insight. Used by
-     * bytecode manipulation methods that patch methods to be ready for
+     * bytecode manipulation transformers that patch methods to be ready for
      * {@link JvmInsight}.
      *
-     * @param lkp lookup to use
-     * @param name name of method
+     * @param lkp lookup of the class that is being bytecode patched
+     * @param name name of the configuration to fetch
+     *    - either {@code "ROOTS"} or {@code "STATEMENTS"}.
      * @param type requested method type
      * @return the callsite
      * @throw IllegalArgumentException if the {@code name} isn't recognized
