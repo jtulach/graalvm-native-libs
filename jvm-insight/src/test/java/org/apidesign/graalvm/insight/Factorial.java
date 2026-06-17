@@ -13,6 +13,10 @@
  */
 package org.apidesign.graalvm.insight;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.MutableCallSite;
+
 public class Factorial {
     private Factorial() {
     }
@@ -21,7 +25,7 @@ public class Factorial {
         if (n <= 1) {
             return 1;
         } else {
-            var n1 = fac(n - 1);
+            int n1 = fac(n - 1);
             return n * n1;
         }
     }
@@ -32,7 +36,7 @@ public class Factorial {
         int type_i, long type_l, char type_c,
         float type_f, double type_d
     ) {
-        var txt = prefix + type_z + type_b + type_s + type_i + type_l + type_c + type_f + type_d;
+        String txt = prefix + type_z + type_b + type_s + type_i + type_l + type_c + type_f + type_d;
         return txt.length();
     }
 
@@ -42,8 +46,8 @@ public class Factorial {
 
     private static final java.lang.invoke.MutableCallSite meaningSite;
     static {
-        var target = java.lang.invoke.MethodHandles.constant(int.class, -1);
-        meaningSite = new java.lang.invoke.MutableCallSite(target);
+        var target = MethodHandles.constant(int.class, -1);
+        meaningSite = new MutableCallSite(target);
     }
     public static int countMeaning;
     public static int meaning() {
@@ -52,16 +56,14 @@ public class Factorial {
     }
 
     private static java.lang.invoke.CallSite meaningBootstrap(
-        java.lang.invoke.MethodHandles.Lookup lkp,
-        String name,
-        java.lang.invoke.MethodType t
+        MethodHandles.Lookup lkp, String name, MethodType t
     ) {
         return meaningSite;
     }
 
     public static void enableDynamicMeaning() throws Exception {
-        var lkp = java.lang.invoke.MethodHandles.lookup();
-        var mt = java.lang.invoke.MethodType.methodType(int.class);
+        var lkp = MethodHandles.lookup();
+        var mt = MethodType.methodType(int.class);
         var handle = lkp.findStatic(Factorial.class, "meaning", mt);
         meaningSite.setTarget(handle);
     }

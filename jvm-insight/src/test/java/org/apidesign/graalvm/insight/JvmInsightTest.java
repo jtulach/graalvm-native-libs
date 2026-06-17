@@ -46,7 +46,7 @@ public class JvmInsightTest {
     public static void initializeContext() throws Exception {
         out = new ByteArrayOutputStream();
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
-        final HostAccess hostAccess = HostAccess.newBuilder()
+        var hostAccess = HostAccess.newBuilder()
                 .allowAccessAnnotatedBy(HostAccess.Export.class)
                 .allowImplementationsAnnotatedBy(FunctionalInterface.class)
                 .allowMapAccess(true)
@@ -61,7 +61,7 @@ public class JvmInsightTest {
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
 
-        var loader = new JvmInsight(Factorial.class.getClassLoader().getParent(), cp);
+        var loader = new JvmInsightLoader(Factorial.class.getClassLoader().getParent(), cp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotNull(FactorialHosted, "Factorial class is loaded");
     }
@@ -122,20 +122,20 @@ public class JvmInsightTest {
         }
 
         assertEquals("""
-        Line 21 with n=5
-        Line 24 with n=5
-        Line 21 with n=4
-        Line 24 with n=4
-        Line 21 with n=3
-        Line 24 with n=3
-        Line 21 with n=2
-        Line 24 with n=2
-        Line 21 with n=1
-        Line 22 with n=1
-        Line 25 with n=2
-        Line 25 with n=3
-        Line 25 with n=4
         Line 25 with n=5
+        Line 28 with n=5
+        Line 25 with n=4
+        Line 28 with n=4
+        Line 25 with n=3
+        Line 28 with n=3
+        Line 25 with n=2
+        Line 28 with n=2
+        Line 25 with n=1
+        Line 26 with n=1
+        Line 29 with n=2
+        Line 29 with n=3
+        Line 29 with n=4
+        Line 29 with n=5
         """, out.toString(), "Properly captured stepping thru the fac function");
     }
 
