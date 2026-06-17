@@ -40,12 +40,29 @@ public class Factorial {
         return -1;
     }
 
+    private static final java.lang.invoke.MutableCallSite meaningSite;
+    static {
+        var target = java.lang.invoke.MethodHandles.constant(int.class, -1);
+        meaningSite = new java.lang.invoke.MutableCallSite(target);
+    }
+    public static int countMeaning;
+    public static int meaning() {
+        countMeaning++;
+        return 42;
+    }
+
     private static java.lang.invoke.CallSite meaningBootstrap(
         java.lang.invoke.MethodHandles.Lookup lkp,
         String name,
         java.lang.invoke.MethodType t
     ) {
-        var target = java.lang.invoke.MethodHandles.constant(int.class, 42);
-        return new java.lang.invoke.ConstantCallSite(target);
+        return meaningSite;
+    }
+
+    public static void enableDynamicMeaning() throws Exception {
+        var lkp = java.lang.invoke.MethodHandles.lookup();
+        var mt = java.lang.invoke.MethodType.methodType(int.class);
+        var handle = lkp.findStatic(Factorial.class, "meaning", mt);
+        meaningSite.setTarget(handle);
     }
 }

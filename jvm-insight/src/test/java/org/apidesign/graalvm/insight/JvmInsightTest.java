@@ -200,8 +200,18 @@ public class JvmInsightTest {
 
     @Test
     public void testCallsite() throws Exception {
-        var number = (Number)FactorialHosted.getMethod("callsite").invoke(null);
-        assertEquals(42, number.intValue());
+        var exp = -1;
+        for (int i = 0; i <= 1_000_000; i++) {
+            var number = (Number)FactorialHosted.getMethod("callsite").invoke(null);
+            assertEquals(exp, number.intValue(), "Round #" + i);
+            if (i == 999_000) {
+                exp = 42;
+                // switch to call the meaning() method
+                FactorialHosted.getMethod("enableDynamicMeaning").invoke(null);
+            }
+        }
+        var countMeaning = (Number) FactorialHosted.getField("countMeaning").get(null);
+        assertEquals(1000, countMeaning, "Thousand calls into meaning() method");
     }
 
 
