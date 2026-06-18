@@ -20,6 +20,7 @@ import java.lang.invoke.MethodType;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 public final class JvmInsight  {
     private static BiConsumer<String, Map<String, Object>> ROOTS;
@@ -39,22 +40,59 @@ public final class JvmInsight  {
     public static AutoCloseable apply(Consumer<JvmInsight> block) {
         block.accept(new JvmInsight());
         return () -> {
+            ROOTS = null;
+            STATEMENTS = null;
         };
     }
 
 
-    /** Registers an Insight handler on given type.
+    /** Registers an Insight handler on given type. This method selects
+     * a class to operate on and returns a builder to configure the <em>Insight</em>.
      *
-     * @param type
-     * @param handler
-     * @param cfg
+     * @param clazz the clazz to operate on
+     * @return builder to configure and finish with {@link Builder#call} to register
+     *    the callback
      */
-    public void on(String type, BiConsumer<String, Map<String, Object>> handler, Map<String, Object> cfg) {
-        if (Boolean.TRUE.equals(cfg.get("roots"))) {
-            ROOTS = handler;
+    public Builder on(Class<?> clazz) {
+        return new Builder(clazz);
+    }
+
+    /** Configuration for an Insight callback.
+     * Use methods of this class to configure a callback and then register
+     * it by calling {@link Builder#call}.
+     */
+    public static final class Builder {
+        private final Class<?> clazz;
+        private boolean statements;
+        private boolean roots;
+        private Pattern methodFilter;
+
+        private Builder(Class<?> clazz) {
+            this.clazz = clazz;
         }
-        if (Boolean.TRUE.equals(cfg.get("statements"))) {
-            STATEMENTS = handler;
+
+        public Builder roots() {
+            this.roots = true;
+            return this;
+        }
+
+        public Builder statements() {
+            this.statements = true;
+            return this;
+        }
+
+        public Builder methodName(Pattern regExp) {
+            this.methodFilter = regExp;
+            return this;
+        }
+
+        public void call(BiConsumer<String, Map<String, Object>> handler) {
+            if (roots) {
+                ROOTS = handler;
+            }
+            if (statements) {
+                STATEMENTS = handler;
+            }
         }
     }
 

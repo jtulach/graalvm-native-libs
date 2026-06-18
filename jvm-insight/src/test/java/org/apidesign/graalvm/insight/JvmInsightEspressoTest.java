@@ -81,7 +81,7 @@ public final class JvmInsightEspressoTest {
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
 
-        var loader = new JvmInsightLoader(new AvoidingLoader(Factorial.class), bothCp);
+        var loader = new JvmInsightLoader(new AvoidClassLoader(Factorial.class), bothCp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");
@@ -240,6 +240,8 @@ public final class JvmInsightEspressoTest {
         ESPRESSO, JVM;
 
         public static final class Insight {
+
+            private AutoCloseable handle;
             private Insight() {
             }
 
@@ -269,8 +271,15 @@ public final class JvmInsightEspressoTest {
                         fn.apply(ctx, frame);
                     }
                 };
-                JvmInsight.apply((insight) -> {
-                   insight.on("enter", handler, cfg);
+                handle = JvmInsight.apply((insight) -> {
+                    var bldr = insight.on(FactorialHosted);
+                    if (Boolean.TRUE.equals(cfg.get("roots"))) {
+                        bldr.roots();
+                    }
+                    if (Boolean.TRUE.equals(cfg.get("statements"))) {
+                        bldr.statements();
+                    }
+                    bldr.call(handler);
                 });
             }
         }
@@ -290,11 +299,7 @@ public final class JvmInsightEspressoTest {
                 var evalFn = initFn.execute(jvmInsight);
                 evalFn.executeVoid(code);
 
-                return () -> {
-                    JvmInsight.apply((insight) -> {
-                       insight.on("enter", null, Map.of("roots", true, "statements", true));
-                    });
-                };
+                return jvmInsight.handle;
             } else {
                 var engine = ctx.getEngine();
 
@@ -331,27 +336,4 @@ public final class JvmInsightEspressoTest {
         }
     }
 
-    /** Classloader to allow loading patched {@link Factorial} class.
-     * Our class as well as patched {@link Factorial} class need to have a
-     * reference to the same {@link JvmInsight} class. When running unit tests
-     * all three classes are loaded by the same classloader. Creating a child
-     * classloader to load {@link Factorial} requires us to mask out that
-     * class. That's what the {@link AvoidingLoader} does.
-     */
-    private static final class AvoidingLoader extends ClassLoader {
-        private final Class<?> avoid;
-
-        AvoidingLoader(Class<?> avoid) {
-            super(avoid.getClassLoader());
-            this.avoid = avoid;
-        }
-
-        @Override
-        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if (avoid.getName().equals(name)) {
-                throw new ClassNotFoundException(name);
-            }
-            return super.loadClass(name, resolve);
-        }
-    }
 }
