@@ -34,13 +34,28 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-public class JvmInsightTest {
-    private static ByteArrayOutputStream out;
+/** Tests compatibility between Espresso+GraalVM Insight and JVM Insight with
+ * Graal.js.
+ */
+public final class JvmInsightEspressoTest {
+    /** Context to execute JavaScript Insight scripts in. */
     private static Context ctx;
+    /** Captured output from the {@link #ctx} context. */
+    private static ByteArrayOutputStream out;
+    /**
+     * The {@link Factorial} class loaded by Espresso. As Espresso supports
+     * GraalVM Insight out of the box, there is no special configuration to
+     * do to make the class GraalVM Insight capable.
+     */
     private static Value Factorial;
+    /** This is the {@link Factorial} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
     private static Class<?> FactorialHosted;
 
-    public JvmInsightTest() {
+    public JvmInsightEspressoTest() {
     }
 
     @BeforeAll
@@ -280,18 +295,19 @@ public class JvmInsightTest {
                        insight.on("enter", null, Map.of("roots", true, "statements", true));
                     });
                 };
+            } else {
+                var engine = ctx.getEngine();
+
+                var insight = engine.getInstruments().get("insight");
+                assertNotNull(insight, "There must be the insight instrument");
+
+                @SuppressWarnings("unchecked")
+                var fn = (Function<Source, AutoCloseable>) insight.lookup(Function.class);
+                assertNotNull(fn, "There must be an insight registraiton function");
+
+                var insightScript = Source.newBuilder("js", code, name).build();
+                return fn.apply(insightScript);
             }
-            var engine = ctx.getEngine();
-
-            var insight = engine.getInstruments().get("insight");
-            assertNotNull(insight, "There must be an insight instrument");
-
-            @SuppressWarnings("unchecked")
-            var fn = (Function<Source, AutoCloseable>) insight.lookup(Function.class);
-            assertNotNull(fn, "There must be an insight registraiton function");
-
-            var insightScript = Source.newBuilder("js", code, name).build();
-            return fn.apply(insightScript);
         }
 
         final long invokeFactorialMethodLong(String name, Object... args) {
@@ -315,6 +331,13 @@ public class JvmInsightTest {
         }
     }
 
+    /** Classloader to allow loading patched {@link Factorial} class.
+     * Our class as well as patched {@link Factorial} class need to have a
+     * reference to the same {@link JvmInsight} class. When running unit tests
+     * all three classes are loaded by the same classloader. Creating a child
+     * classloader to load {@link Factorial} requires us to mask out that
+     * class. That's what the {@link AvoidingLoader} does.
+     */
     private static final class AvoidingLoader extends ClassLoader {
         private final Class<?> avoid;
 
