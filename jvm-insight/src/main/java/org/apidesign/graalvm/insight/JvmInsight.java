@@ -114,14 +114,21 @@ public final class JvmInsight  {
         try {
             var myLkp = MethodHandles.lookup();
             var handle = switch (name) {
-                case "ROOTS" -> myLkp.findStaticGetter(JvmInsight.class, "ROOTS", BiConsumer.class);
-                case "STATEMENTS" -> myLkp.findStaticGetter(JvmInsight.class, "STATEMENTS", BiConsumer.class);
+                case "ROOTS" -> myLkp.findStatic(JvmInsight.class, "roots", MethodType.methodType(BiConsumer.class));
+                case "STATEMENTS" -> myLkp.findStatic(JvmInsight.class, "statements", MethodType.methodType(BiConsumer.class));
                 default -> throw new NoSuchFieldException(name);
             };
             return new ConstantCallSite(handle);
-        } catch (NoSuchFieldException | IllegalAccessException ex) {
+        } catch (NoSuchMethodException | NoSuchFieldException | IllegalAccessException ex) {
             throw new IllegalArgumentException(ex);
         }
     }
 
+    private static BiConsumer<String, Map<String, Object>> roots() {
+        return ROOTS;
+    }
+
+    private static BiConsumer<String, Map<String, Object>> statements() {
+        return STATEMENTS;
+    }
 }
