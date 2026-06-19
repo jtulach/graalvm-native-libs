@@ -91,8 +91,11 @@ final class JvmInsightTransform implements ClassTransform {
                                 }
                             }
                             if (instr instanceof StoreInstruction store) {
-                                java.lang.classfile.instruction.LocalVariable initializedVar = localTypes.get(store.slot());
-                                locals.put(store.slot(), initializedVar);
+                                var initializedVar = localTypes.get(store.slot());
+                                if (initializedVar != null) {
+                                    // initializedVar can be null when there is no debug info
+                                    locals.put(store.slot(), initializedVar);
+                                }
                             }
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
@@ -131,12 +134,14 @@ final class JvmInsightTransform implements ClassTransform {
         cb.ifnull(noCallback);
         cb.invokedynamic(ref);
         cb.loadConstant(fqn(model.thisClass(), method, line));
+        var argumentCount = 0;
         for (var l : locals) {
             cb.loadConstant(l.name().stringValue());
             loadObjectWraper(cb, l);
+            argumentCount += 2;
         }
         var Map = ClassDesc.of("java.util.Map");
-        var ofArgsType = MethodTypeDesc.of(Map, Collections.nCopies(locals.size() * 2, ConstantDescs.CD_Object));
+        var ofArgsType = MethodTypeDesc.of(Map, Collections.nCopies(argumentCount, ConstantDescs.CD_Object));
         cb.invokestatic(Map, "of", ofArgsType, true);
         var consumeType = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object, ConstantDescs.CD_Object);
         cb.invokeinterface(callbackClass, "accept", consumeType);
