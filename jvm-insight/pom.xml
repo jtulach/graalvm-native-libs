@@ -78,4 +78,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Agent-Class>org.apidesign.graalvm.insight.JvmInsightAgent</Agent-Class>
+                            <Premain-Class>org.apidesign.graalvm.insight.JvmInsightAgent</Premain-Class>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
