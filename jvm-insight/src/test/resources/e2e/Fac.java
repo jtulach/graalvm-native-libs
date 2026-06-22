@@ -13,17 +13,15 @@
  */
 
 // $ javac Fac.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight} Fac
+// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fac,methods=.*fac.* Fac
 // > fac(5) = 120
-// 2> [JvmInsightAgent]: premain args: null
-// 2> [JvmInsightAgent]: transforming Hello redefine: null
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.main([Ljava/lang/String;)V with local variables: {args=[Ljava.lang.String;@5d099f62}
+// 2> [JvmInsightAgent]: Transforming Fac
 // 2> enter Fac.main
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fac(I)I with local variables: {n=5}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fac(I)I with local variables: {n=4}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fac(I)I with local variables: {n=3}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fac(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fac(I)I with local variables: {n=1}
+// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=5}
+// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=4}
+// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=3}
+// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=2}
+// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=1}
 // 2> exit Fac.main
 // $ exit
 

@@ -18,6 +18,7 @@ import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
+import java.util.regex.Pattern;
 
 /** Entry point for using JVM Insight as Java agent. Usage:
  * <pre>
@@ -28,24 +29,65 @@ import java.security.ProtectionDomain;
  *
  */
 final class JvmInsightAgent implements ClassFileTransformer {
+    /** Option to select what class to instrument.
+     * Use {@code -javaagent=jvm-insight.jar=classes=.*Reg} to select
+     * what classes to instrument.
+     */
+    private static final String OPT_CLASSES = "classes";
+
+    /** Option to select what method to instrument.
+     * Use {@code -javaagent=jvm-insight.jar=methods=.*Reg} to select
+     * what classes to instrument.
+     */
+    private static final String OPT_METHODS = "methods";
+
     private final ClassFile clazzFile;
+    private final Pattern pattern;
+    private final Pattern methods;
 
     public static void premain(String args, Instrumentation instr) throws Exception {
-        log("premain args: " + args);
         registerAgent(args, instr);
     }
 
     public static void agentmain(String args, Instrumentation instr) throws Exception {
-        log("agentmain args: " + args);
         registerAgent(args, instr);
     }
 
     private static void registerAgent(String args, Instrumentation instr) throws Exception {
-        instr.addTransformer(new JvmInsightAgent());
+        Pattern classes = null;
+        Pattern methods = null;
+
+        if (args != null) {
+            var segments = args.split(",");
+            for (var seg : segments) {
+                var keyValue = seg.split("=");
+                if (keyValue.length != 2) {
+                    throw new IllegalStateException("Expecting key=value, but was: " + seg);
+                }
+                switch (keyValue[0]) {
+                    case OPT_CLASSES -> {
+                        classes = Pattern.compile(keyValue[1]);
+                    }
+                    case OPT_METHODS -> {
+                        methods = Pattern.compile(keyValue[1]);
+                    }
+                    default -> {
+                        throw new IllegalStateException("Unknown option " + seg);
+                    }
+                }
+            }
+        }
+
+        instr.addTransformer(new JvmInsightAgent(classes, methods));
     }
 
-    private JvmInsightAgent() {
+    private JvmInsightAgent(Pattern pattern, Pattern methods) {
+        if (pattern == null) {
+            throw new IllegalArgumentException("Specify pattern=.*MyClass.*method.*");
+        }
         this.clazzFile = ClassFile.of();
+        this.pattern = pattern;
+        this.methods = methods;
     }
 
     @Override
@@ -54,12 +96,14 @@ final class JvmInsightAgent implements ClassFileTransformer {
         String className, Class<?> classBeingRedefined,
         ProtectionDomain protectionDomain, byte[] classfileBuffer
     ) throws IllegalClassFormatException {
-        if (className.contains("Hello")) {
+        if (pattern.matcher(className).matches()) {
             try {
-                log("transforming " + className + " redefine: " + classBeingRedefined);
+                log("Transforming " + className);
                 var handle = JvmInsight.apply((insight) -> {
                     insight.on(null).roots().call((methodName, localVars) -> {
-                        log("Callback for " + methodName + " with local variables: " + localVars);
+                        if (methods == null || methods.matcher(methodName).matches()) {
+                            log("Callback for " + methodName + " with local variables: " + localVars);
+                        }
                     });
                 });
                 var model = clazzFile.parse(classfileBuffer);

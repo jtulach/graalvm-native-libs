@@ -13,27 +13,24 @@
  */
 
 // $ javac Fib.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight} Fib
+// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fib.*,methods=.*fib.* Fib
 // > fib(5) = 8
-// 2> [JvmInsightAgent]: premain args: null
-// 2> [JvmInsightAgent]: transforming Hello redefine: null
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.main([Ljava/lang/String;)V with local variables: {args=[Ljava.lang.String;@5d099f62}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=5}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=4}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=3}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=0}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=0}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=3}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=0}
-// 2> [JvmInsightAgent]: Callback for -1:LHello;.fib(I)I with local variables: {n=1}
-// 2> exit Hello.main
+// 2> [JvmInsightAgent]: Transforming Fib
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=5}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=4}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=3}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=2}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=0}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=2}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=0}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=3}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=2}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=0}
+// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
 // $ exit
 
 class Fib {

@@ -13,12 +13,12 @@
  */
 
 // $ javac Hello.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight} Hello
+// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Hello,methods=.*hi.* Hello
 // > Hi World!
-// 2> Callback for -1:LHello;.main([Ljava/lang/String;)V with local variables: {args=[Ljava.lang.String;@[0-9a-f]+}
+// 2> [JvmInsightAgent]: Transforming Hello
 // 2> enter Hello.main
 // 2> [JvmInsightAgent]: Callback for -1:LHello;.hi(Ljava/lang/String;)Ljava/lang/String; with local variables: {subject=World!}
-// 2> exit Hello.main>
+// 2> exit Hello.main
 // $ exit
 
 class Hello {
