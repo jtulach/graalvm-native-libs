@@ -12,25 +12,25 @@
  * limitations under the License.
  */
 
-// $ javac Fib.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fib.*,methods=.*fib.* Fib
+// $ javac Fib.java PrintingCallback.java -g -d ${classes}
+// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fib.*,methods=.*fib.*,handler=e2e.PrintingCallback Fib
 // > fib(5) = 8
 // 2> [JvmInsightAgent]: Transforming Fib
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=5}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=4}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=3}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=0}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=0}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=3}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=0}
-// 2> [JvmInsightAgent]: Callback for -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=5}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=4}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=3}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=2}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=0}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=2}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=0}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=3}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=2}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=1}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=0}
+// 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=1}
 // $ exit
 
 class Fib {

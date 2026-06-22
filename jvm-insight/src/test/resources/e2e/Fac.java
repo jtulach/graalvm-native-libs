@@ -12,16 +12,16 @@
  * limitations under the License.
  */
 
-// $ javac Fac.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fac,methods=.*fac.* Fac
+// $ javac Fac.java PrintingCallback.java -g -d ${classes}
+// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fac,methods=.*fac.*,handler=e2e.PrintingCallback Fac
 // > fac(5) = 120
 // 2> [JvmInsightAgent]: Transforming Fac
 // 2> enter Fac.main
-// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=5}
-// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=4}
-// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=3}
-// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=2}
-// 2> [JvmInsightAgent]: Callback for -1:LFac;.fac(I)I with local variables: {n=1}
+// 2> [Callback]: Method -1:LFac;.fac(I)I with local variables: {n=5}
+// 2> [Callback]: Method -1:LFac;.fac(I)I with local variables: {n=4}
+// 2> [Callback]: Method -1:LFac;.fac(I)I with local variables: {n=3}
+// 2> [Callback]: Method -1:LFac;.fac(I)I with local variables: {n=2}
+// 2> [Callback]: Method -1:LFac;.fac(I)I with local variables: {n=1}
 // 2> exit Fac.main
 // $ exit
 

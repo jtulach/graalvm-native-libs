@@ -18,6 +18,8 @@ import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
+import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 
 /** Entry point for using JVM Insight as Java agent. Usage:
@@ -41,9 +43,22 @@ final class JvmInsightAgent implements ClassFileTransformer {
      */
     private static final String OPT_METHODS = "methods";
 
+    /** Option to specify a class to callback when an event happens.
+     * The class must be reachable by a application classloader. The
+     * class must be public and must have a default constructor. The
+     * class should implement {@link BiConsumer}{@code <String, Map<String, Object>>}
+     * and then it gets callback with a name of class+method+signature and
+     * access to local variables.
+     *
+     * Use {@code -javaagent=jvm-insight.jar=handler=my.pkg.CallMe} to specify
+     * what classes to instrument.
+     */
+    private static final String OPT_HANDLER = "handler";
+
     private final ClassFile clazzFile;
     private final Pattern pattern;
     private final Pattern methods;
+    private final BiConsumer<String, Map<String, Object>> handler;
 
     public static void premain(String args, Instrumentation instr) throws Exception {
         registerAgent(args, instr);
@@ -56,6 +71,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
     private static void registerAgent(String args, Instrumentation instr) throws Exception {
         Pattern classes = null;
         Pattern methods = null;
+        BiConsumer<String, Map<String, Object>> handler = null;
 
         if (args != null) {
             var segments = args.split(",");
@@ -71,6 +87,11 @@ final class JvmInsightAgent implements ClassFileTransformer {
                     case OPT_METHODS -> {
                         methods = Pattern.compile(keyValue[1]);
                     }
+                    case OPT_HANDLER -> {
+                        var clazz = Class.forName(keyValue[1], true, ClassLoader.getSystemClassLoader());
+                        // @SuppressWarnings({"unchecked", "deprecation"})
+                        handler = (BiConsumer) clazz.newInstance();
+                    }
                     default -> {
                         throw new IllegalStateException("Unknown option " + seg);
                     }
@@ -78,16 +99,23 @@ final class JvmInsightAgent implements ClassFileTransformer {
             }
         }
 
-        instr.addTransformer(new JvmInsightAgent(classes, methods));
+        instr.addTransformer(new JvmInsightAgent(classes, methods, handler));
     }
 
-    private JvmInsightAgent(Pattern pattern, Pattern methods) {
+    private JvmInsightAgent(
+        Pattern pattern, Pattern methods,
+        BiConsumer<String, Map<String, Object>> handler
+    ) {
         if (pattern == null) {
-            throw new IllegalArgumentException("Specify pattern=.*MyClass.*method.*");
+            throw new IllegalArgumentException("Specify classses=.*MyClass.* filter");
+        }
+        if (handler == null) {
+            throw new IllegalArgumentException("Specify handler=my.pkg.MyHandler");
         }
         this.clazzFile = ClassFile.of();
         this.pattern = pattern;
         this.methods = methods;
+        this.handler = handler;
     }
 
     @Override
@@ -102,7 +130,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
                 var handle = JvmInsight.apply((insight) -> {
                     insight.on(null).roots().call((methodName, localVars) -> {
                         if (methods == null || methods.matcher(methodName).matches()) {
-                            log("Callback for " + methodName + " with local variables: " + localVars);
+                            handler.accept(methodName, localVars);
                         }
                     });
                 });
