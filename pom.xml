@@ -20,13 +20,13 @@
     <artifactId>pom</artifactId>
     <version>2.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    
+
     <name>Extra GraalVM Native Utilities</name>
     <url>https://github.com/jtulach/graalvm-native-libs</url>
     <description>
     This package contains useful utilities for working with GraalVM native-image ahead-of-time compilation.
     </description>
-    
+
     <modules>
         <module>jvm-channel</module>
         <module>examples/jvmlauncher</module>
@@ -198,6 +198,10 @@
                             </goals>
                         </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>3.5.5</version>
                 </plugin>
             </plugins>
         </pluginManagement>

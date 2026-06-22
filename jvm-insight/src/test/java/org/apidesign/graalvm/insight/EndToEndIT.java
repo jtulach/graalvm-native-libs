@@ -15,6 +15,9 @@ package org.apidesign.graalvm.insight;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -54,38 +57,80 @@ public final class EndToEndIT {
         var commandsAndOutput = Files.readAllLines(script.toPath()).stream()
             .filter(line -> line.startsWith("//"))
             .toList();
-        var commands = commandsAndOutput.stream()
-            .filter(line -> line.startsWith("// $ "))
-            .map(line -> line.substring(5))
-            .toList();
+
+        CmdRun current = null;
+        List<CmdRun> commands = new ArrayList<>();
+        for (var line : commandsAndOutput) {
+            if (line.startsWith("// $ ")) {
+                if (current != null) {
+                    commands.add(current);
+                }
+                current = new CmdRun(line.substring(5));
+            } else {
+                if (current == null) {
+                    throw new IllegalStateException("Unexpected line: " + line);
+                }
+                if (line.startsWith("// >")) {
+                    current.stdout().add(line.substring(5));
+                } else if (line.startsWith("// <")) {
+                    current.stdin().add(line.substring(5));
+                } else if (line.startsWith("// 2>")) {
+                    current.stderr().add(line.substring(6));
+                } else {
+                    throw new IllegalStateException("Unexpected line: " + line);
+                }
+            }
+        }
+        if (current != null) {
+            commands.add(current);
+        }
         for (var rawLine : commands) {
             var cmdLine = rawLine
-                .trim()
-                .replace("${jvminsight}", jarFile.getAbsolutePath())
-                .replace("${classes}", classes.getAbsolutePath());
+                .execute()
+                .trim();
 
-            var cmdArgs = cmdLine.split(" +");
-            if (cmdArgs.length == 1 && "exit".equals(cmdArgs[0])) {
+            var rawArgs = cmdLine.split(" +");
+            if (rawArgs.length == 1 && "exit".equals(rawArgs[0])) {
                 // successfully executed
                 return;
             }
+            var cmdArgs = Stream.of(rawArgs)
+                .map(line -> line
+                    .replace("${jvminsight}", jarFile.getAbsolutePath())
+                    .replace("${classes}", classes.getAbsolutePath())
+                )
+                .toArray(String[]::new);
 
             var exe = new File(jvmBin, cmdArgs[0]);
             assertTrue(exe.canExecute(), "The command can be executed: " + exe);
             cmdArgs[0] = exe.getAbsolutePath();
 
             var bldr = new ProcessBuilder(cmdArgs)
-                .inheritIO()
                 .directory(script.getParentFile());
 
             var proc = bldr.start();
+            for (var line : rawLine.stdout()) {
+                proc.getOutputStream().write(line.getBytes());
+                proc.getOutputStream().write('\n');
+            }
             var exitCode = proc.waitFor();
-            var stdErr = new String(proc.getErrorStream().readAllBytes());
             var stdOut = new String(proc.getInputStream().readAllBytes());
+            var stdErr = new String(proc.getErrorStream().readAllBytes());
             assertEquals(0, exitCode, "Failure executing " + cmdLine + "\n" + stdOut + "\n" + stdErr);
-
-            System.err.println("checkoutput: " + stdOut);
+            var expOut = String.join("\n", rawLine.stdout());
+            assertEquals(expOut.trim(), stdOut.trim());
+            var expErr = String.join("\n", rawLine.stderr());
+            assertEquals(expErr.trim(), stdErr.trim());
         }
         fail("Finish the sequence of commands by using 'exit'");
+    }
+
+    private static record CmdRun(
+        String execute,
+        List<String> stdin, List<String> stdout, List<String> stderr
+    ) {
+        private CmdRun (String execute) {
+            this(execute.trim(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+        }
     }
 }

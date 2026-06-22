@@ -14,32 +14,21 @@
 
 // $ javac Hello.java -g -d ${classes}
 // $ java -cp ${classes} -javaagent:${jvminsight} Hello
+// > Hi World!
+// 2> Callback for -1:LHello;.main([Ljava/lang/String;)V with local variables: {args=[Ljava.lang.String;@[0-9a-f]+}
+// 2> enter Hello.main
+// 2> [JvmInsightAgent]: Callback for -1:LHello;.hi(Ljava/lang/String;)Ljava/lang/String; with local variables: {subject=World!}
+// 2> exit Hello.main>
 // $ exit
 
 class Hello {
-    private static int fac(int n) {
-        if (n <= 1) {
-            return 1;
-        } else {
-            var n1 = fac(n - 1);
-            return n1 * n;
-        }
-    }
-
-    private static int fib(int n) {
-        if (n <= 1) {
-            return 1;
-        } else {
-            var n1 = fib(n - 1);
-            var n2 = fib(n - 2);
-            return n1 + n2;
-        }
+    private static String hi(String subject) {
+        return "Hi " + subject;
     }
 
     public static void main(String... args) {
         System.err.println("enter Hello.main");
-        System.out.println("fac(5) = " + fac(5));
-        System.out.println("fib(5) = " + fib(5));
+        System.out.println(hi("World!"));
         System.err.println("exit Hello.main");
     }
 }
