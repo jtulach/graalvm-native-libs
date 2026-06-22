@@ -14,8 +14,10 @@
 package org.apidesign.graalvm.insight;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,13 +34,19 @@ import org.junit.jupiter.api.io.TempDir;
  *
  */
 public final class EndToEndIT {
-    public static File[] allScriptFiles() throws Exception {
+    public static List<File> allScriptFiles() throws Exception {
         var u = EndToEndIT.class.getResource("/e2e/Hello.java");
         assertNotNull(u, "There must be Hello.java example");
         var f = new File(u.toURI());
         var d = f.getParentFile();
-        var arr = d.listFiles();
-        assertNotNull(arr, "There must be some files in " + d);
+        var arr = new ArrayList<File>();
+        var raw = d.listFiles();
+        assertNotNull(raw, "There must be some files in " + d);
+        for (var ch : raw) {
+            if (ch.getName().endsWith(".java")) {
+                arr.add(ch);
+            }
+        }
         return arr;
     }
 
@@ -54,36 +62,42 @@ public final class EndToEndIT {
 
         var jvmBin = new File(new File(System.getProperty("java.home")), "bin");
 
-        var commandsAndOutput = Files.readAllLines(script.toPath()).stream()
-            .filter(line -> line.startsWith("//"))
-            .toList();
-
-        CmdRun current = null;
         List<CmdRun> commands = new ArrayList<>();
-        for (var line : commandsAndOutput) {
-            if (line.startsWith("// $ ")) {
-                if (current != null) {
-                    commands.add(current);
-                }
-                current = new CmdRun(line.substring(5));
-            } else {
-                if (current == null) {
-                    throw new IllegalStateException("Unexpected line: " + line);
-                }
-                if (line.startsWith("// >")) {
-                    current.stdout().add(line.substring(5));
-                } else if (line.startsWith("// <")) {
-                    current.stdin().add(line.substring(5));
-                } else if (line.startsWith("// 2>")) {
-                    current.stderr().add(line.substring(6));
+        try {
+            var commandsAndOutput = Files.readAllLines(script.toPath()).stream()
+                .filter(line -> line.startsWith("//"))
+                .toList();
+
+            CmdRun current = null;
+            for (var line : commandsAndOutput) {
+                if (line.startsWith("// $ ")) {
+                    if (current != null) {
+                        commands.add(current);
+                    }
+                    current = new CmdRun(line.substring(5));
                 } else {
-                    throw new IllegalStateException("Unexpected line: " + line);
+                    if (current == null) {
+                        throw new IllegalStateException("Unexpected line: " + line);
+                    }
+                    if (line.startsWith("// >")) {
+                        current.stdout().add(line.substring(5));
+                    } else if (line.startsWith("// <")) {
+                        current.stdin().add(line.substring(5));
+                    } else if (line.startsWith("// 2>")) {
+                        current.stderr().add(line.substring(6));
+                    } else {
+                        throw new IllegalStateException("Unexpected line: " + line);
+                    }
                 }
             }
+            if (current != null) {
+                commands.add(current);
+            }
+        } catch (Exception ex) {
+            throw new IOException("Cannot read " + script, ex);
         }
-        if (current != null) {
-            commands.add(current);
-        }
+
+        var log = new StringBuilder();
         for (var rawLine : commands) {
             var cmdLine = rawLine
                 .execute()
@@ -101,9 +115,14 @@ public final class EndToEndIT {
                 )
                 .toArray(String[]::new);
 
-            var exe = new File(jvmBin, cmdArgs[0]);
-            assertTrue(exe.canExecute(), "The command can be executed: " + exe);
+            var exe = new File(cmdArgs[0]);
+            if (!exe.isAbsolute() || !exe.canExecute()) {
+                exe = new File(jvmBin, cmdArgs[0]);
+            }
+            assertTrue(exe.canExecute(), "The command can be executed: " + exe + "\n" + log);
             cmdArgs[0] = exe.getAbsolutePath();
+
+            log.append("Executing: ").append(Arrays.toString(cmdArgs));
 
             var bldr = new ProcessBuilder(cmdArgs)
                 .directory(script.getParentFile());
@@ -116,11 +135,19 @@ public final class EndToEndIT {
             var exitCode = proc.waitFor();
             var stdOut = new String(proc.getInputStream().readAllBytes());
             var stdErr = new String(proc.getErrorStream().readAllBytes());
-            assertEquals(0, exitCode, "Failure executing " + cmdLine + "\n" + stdOut + "\n" + stdErr);
-            var expOut = String.join("\n", rawLine.stdout());
-            assertEquals(expOut.trim(), stdOut.trim());
-            var expErr = String.join("\n", rawLine.stderr());
-            assertEquals(expErr.trim(), stdErr.trim());
+
+            log.append(stdOut).append("\n");
+            log.append(stdErr).append("\n");
+
+            assertEquals(0, exitCode, "Failure executing " + cmdLine + "\n" + log);
+            var expOut = String.join("\n", rawLine.stdout()).trim();
+            if (!expOut.equals("*")) {
+                assertEquals(expOut, stdOut.trim(), "Unexpected stdout in\n" + log);
+            }
+            var expErr = String.join("\n", rawLine.stderr()).trim();
+            if (!expErr.equals("*")) {
+                assertEquals(expErr, stdErr.trim(), "Unexpected stderr in\n" + log);
+            }
         }
         fail("Finish the sequence of commands by using 'exit'");
     }
