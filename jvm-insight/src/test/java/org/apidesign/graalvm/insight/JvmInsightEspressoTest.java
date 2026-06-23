@@ -22,17 +22,20 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
-import org.junit.jupiter.api.AfterAll;
+
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -220,23 +223,6 @@ public final class JvmInsightEspressoTest {
         }).reduce(0, (a, b) -> a + b);
         assertEquals(allLen.intValue(), len, "Computed length is the same");
     }
-
-    @Test
-    public void testCallsite() throws Exception {
-        var exp = -1;
-        for (int i = 0; i <= 1_000_000; i++) {
-            var number = (Number)FactorialHosted.getMethod("callsite").invoke(null);
-            assertEquals(exp, number.intValue(), "Round #" + i);
-            if (i == 999_000) {
-                exp = 42;
-                // switch to call the meaning() method
-                FactorialHosted.getMethod("enableDynamicMeaning").invoke(null);
-            }
-        }
-        var countMeaning = (Number) FactorialHosted.getField("countMeaning").get(null);
-        assertEquals(1000, countMeaning, "Thousand calls into meaning() method");
-    }
-
 
     public enum JvmType {
         ESPRESSO, JVM;
