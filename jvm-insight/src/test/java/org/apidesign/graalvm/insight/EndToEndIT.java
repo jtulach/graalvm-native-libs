@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Compiles and executes prepared scripts in {@code test/resources/e2e} directory.
@@ -51,7 +52,7 @@ public final class EndToEndIT {
         return arr;
     }
 
-    @TempDir
+    @TempDir(cleanup = CleanupMode.ON_SUCCESS)
     File classes;
 
     @ParameterizedTest

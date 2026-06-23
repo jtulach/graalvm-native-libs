@@ -17,6 +17,7 @@ import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -45,6 +46,18 @@ public final class JvmInsight  {
         };
     }
 
+    /**
+     * Creates a {@link JvmInsight}-ready classloader. Classes loaded by
+     * this {@link ClassLoader} are patched to be ready for {@link #apply}-ing
+     * JVM Insights.
+     *
+     * @param parent the parent classloader to use or {@code null}
+     * @param cp set of classpath elements to load classes from
+     * @return the JVM Insights ready classloader
+     */
+    public static ClassLoader createLoader(ClassLoader parent, URL... cp) {
+        return new JvmInsightLoader(parent, cp);
+    }
 
     /** Registers an Insight handler on given type. This method selects
      * a class to operate on and returns a builder to configure the <em>Insight</em>.
@@ -106,7 +119,7 @@ public final class JvmInsight  {
      *    - either {@code "ROOTS"} or {@code "STATEMENTS"}.
      * @param type requested method type
      * @return the callsite
-     * @throw IllegalArgumentException if the {@code name} isn't recognized
+     * @throws IllegalArgumentException if the {@code name} isn't recognized
      */
     public static CallSite metafactory(
         MethodHandles.Lookup lkp, String name, MethodType type
