@@ -13,8 +13,6 @@
  */
 package org.apidesign.graalvm.insight;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.classfile.ClassFile;
 import java.net.URL;
@@ -43,17 +41,18 @@ final class JvmInsightLoader extends URLClassLoader {
             var arr = is.readAllBytes();
             var newArr = slashName.startsWith("org/apidesign/graalvm/insight/JvmInsight") ?
                     arr: patch(arr);
+            /* Enable and inspect with javap -c -private * /
             try (
-                var os = new FileOutputStream(new File("/tmp/Clazz.class"))
+                var os = new java.io.FileOutputStream(new java.io.File("/tmp/Clazz.class"))
             ) {
                 os.write(newArr);
             }
+            /* */
             return defineClass(name, newArr, 0, newArr.length);
         } catch (IOException ex) {
             throw new ClassNotFoundException(name, ex);
         }
     }
-
 
     private byte[] patch(byte[] arr) {
         var model = clazzFile.parse(arr);
