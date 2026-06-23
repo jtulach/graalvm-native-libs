@@ -21,6 +21,7 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.CodeModel;
 import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
+import java.lang.classfile.attribute.LocalVariableInfo;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LocalVariable;
@@ -49,22 +50,6 @@ final class JvmInsightTransform implements ClassTransform {
     @Override
     public void accept(ClassBuilder builder, ClassElement element) {
         if (element instanceof MethodModel method) {
-            if (method.methodName().equalsString("callsite")) {
-                builder.transformMethod(method, (mb, me) -> {
-                    if (me instanceof CodeModel code) {
-                        mb.withCode(cb -> {
-                            var clazz = model.thisClass().asSymbol();
-                            var boot = ConstantDescs.ofCallsiteBootstrap(clazz, "meaningBootstrap", ConstantDescs.CD_CallSite);
-                            var ref = DynamicCallSiteDesc.of(boot, MethodTypeDesc.of(ConstantDescs.CD_int));
-                            cb.invokedynamic(ref);
-                            cb.ireturn();
-                        });
-                    } else {
-                        mb.with(me);
-                    }
-                });
-                return;
-            }
             builder.transformMethod(method, (mb, me) -> {
                 if (me instanceof CodeModel code) {
                     mb.withCode(cb -> {
@@ -73,12 +58,12 @@ final class JvmInsightTransform implements ClassTransform {
                             count++;
                         }
                         var enterGenerated = false;
-                        var localTypes = new HashMap<Integer, LocalVariable>();
-                        var locals = new HashMap<Integer, LocalVariable>();
+                        var localTypes = new HashMap<Integer, LocalVariableInfo>();
+                        var locals = new HashMap<Integer, LocalVariableInfo>();
                         for (var instr : code.elementList()) {
                             cb.with(instr);
                             // System.err.println("  instr: " + instr);
-                            if (instr instanceof LocalVariable localVar) {
+                            if (instr instanceof LocalVariableInfo localVar) {
                                 if (localVar.typeSymbol() == ConstantDescs.CD_long || localVar.typeSymbol() == ConstantDescs.CD_double) {
                                     // long and double vars occupy two slots
                                     count++;
@@ -102,10 +87,13 @@ final class JvmInsightTransform implements ClassTransform {
                                     onEnter("ROOTS", method, -1, locals.values(), cb);
                                     enterGenerated = true;
                                 }
-                                java.util.Iterator<java.util.Map.Entry<java.lang.Integer, java.lang.classfile.instruction.LocalVariable>> it = localTypes.entrySet().iterator();
+                                var it = localTypes.entrySet().iterator();
                                 while (it.hasNext()) {
                                     var en = it.next();
-                                    if (en.getValue().endScope() == label) {
+                                    if (
+                                        en.getValue() instanceof LocalVariable localVar 
+                                        && localVar.endScope() == label
+                                    ) {
                                         it.remove();
                                         locals.remove(en.getKey());
                                     }
@@ -125,7 +113,7 @@ final class JvmInsightTransform implements ClassTransform {
         }
     }
 
-    private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariable> locals, CodeBuilder cb) {
+    private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, CodeBuilder cb) {
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
         var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite);
         var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass));
@@ -148,47 +136,47 @@ final class JvmInsightTransform implements ClassTransform {
         cb.labelBinding(noCallback);
     }
 
-    private void loadObjectWraper(CodeBuilder cb, LocalVariable l) {
+    private void loadObjectWraper(CodeBuilder cb, LocalVariableInfo l) {
         if (l.typeSymbol().isPrimitive()) {
             switch (l.typeSymbol().descriptorString()) {
                 case "Z" -> {
                     cb.iload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
                     cb.invokestatic(ConstantDescs.CD_Boolean, "valueOf", type);
                 }
                 case "B" -> {
                     cb.iload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Byte, ConstantDescs.CD_byte);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Byte, ConstantDescs.CD_byte);
                     cb.invokestatic(ConstantDescs.CD_Byte, "valueOf", type);
                 }
                 case "C" -> {
                     cb.iload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Character, ConstantDescs.CD_char);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Character, ConstantDescs.CD_char);
                     cb.invokestatic(ConstantDescs.CD_Character, "valueOf", type);
                 }
                 case "S" -> {
                     cb.iload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Short, ConstantDescs.CD_short);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Short, ConstantDescs.CD_short);
                     cb.invokestatic(ConstantDescs.CD_Short, "valueOf", type);
                 }
                 case "I" -> {
                     cb.iload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Integer, ConstantDescs.CD_int);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Integer, ConstantDescs.CD_int);
                     cb.invokestatic(ConstantDescs.CD_Integer, "valueOf", type);
                 }
                 case "J" -> {
                     cb.lload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Long, ConstantDescs.CD_long);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Long, ConstantDescs.CD_long);
                     cb.invokestatic(ConstantDescs.CD_Long, "valueOf", type);
                 }
                 case "F" -> {
                     cb.fload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Float, ConstantDescs.CD_float);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Float, ConstantDescs.CD_float);
                     cb.invokestatic(ConstantDescs.CD_Float, "valueOf", type);
                 }
                 case "D" -> {
                     cb.dload(l.slot());
-                    java.lang.constant.MethodTypeDesc type = MethodTypeDesc.of(ConstantDescs.CD_Double, ConstantDescs.CD_double);
+                    var type = MethodTypeDesc.of(ConstantDescs.CD_Double, ConstantDescs.CD_double);
                     cb.invokestatic(ConstantDescs.CD_Double, "valueOf", type);
                 }
                 default -> throw new IllegalStateException("Unknown descriptor: " + l.typeSymbol().descriptorString());
@@ -202,5 +190,4 @@ final class JvmInsightTransform implements ClassTransform {
         var methodName = "L" + clazz.asInternalName() + ";." + method.methodName() + method.methodTypeSymbol().descriptorString();
         return "" + line + ":" + methodName;
     }
-
 }
