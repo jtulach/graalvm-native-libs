@@ -15,7 +15,6 @@ package e2e;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.regex.Pattern;
 
 import org.apidesign.graalvm.insight.JvmInsight;
 
