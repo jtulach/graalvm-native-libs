@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -64,8 +65,22 @@ public final class EndToEndIT {
 
         List<CmdRun> commands = new ArrayList<>();
         try {
+            var sb = new StringBuilder();
             var commandsAndOutput = Files.readAllLines(script.toPath()).stream()
                 .filter(line -> line.startsWith("//"))
+                .mapMulti((String line, Consumer<String> sink) -> {
+                    if (line.endsWith("\\")) {
+                        sb.append(line.substring(2, line.length() - 1));
+                    } else {
+                        if (sb.isEmpty()) {
+                            sink.accept(line);
+                        } else {
+                            sb.append(line.substring(2));
+                            sink.accept("//" + sb.toString());
+                            sb.setLength(0);
+                        }
+                    }
+                })
                 .toList();
 
             CmdRun current = null;
