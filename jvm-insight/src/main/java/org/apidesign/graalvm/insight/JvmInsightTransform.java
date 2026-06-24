@@ -13,6 +13,7 @@
  */
 package org.apidesign.graalvm.insight;
 
+import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassModel;
@@ -23,8 +24,10 @@ import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
+import java.lang.classfile.attribute.LocalVariableTableAttribute;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.instruction.LineNumber;
+import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LocalVariable;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
@@ -36,6 +39,7 @@ import java.lang.reflect.AccessFlag;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Optional;
 
 /** Transformer patching byte code to be {@link JvmInsight}-ready.
  */
@@ -52,17 +56,39 @@ final class JvmInsightTransform implements ClassTransform {
     public void accept(ClassBuilder builder, ClassElement element) {
         if (element instanceof MethodModel method) {
             builder.transformMethod(method, (mb, me) -> {
-                if (me instanceof CodeModel code) {
+                if (
+                    me instanceof CodeModel code
+                    && code.findAttribute(Attributes.localVariableTable()) instanceof Optional<LocalVariableTableAttribute> opt
+                    && opt.isPresent()
+                ) {
                     mb.withCode(cb -> {
-                        var count = method.methodTypeSymbol().parameterCount();
-                        if (!method.flags().flags().contains(AccessFlag.STATIC)) {
-                            count++;
+                        var firstLabel = cb.newLabel();
+                        var lastLabel = cb.newLabel();
+                        var methodType = method.methodTypeSymbol();
+                        var count = methodType.parameterCount();
+                        {
+                            // copies all the values into an argument
+                            cb.loadConstant(opt.get().localVariables().size());
+                            cb.anewarray(ConstantDescs.CD_Object);
+                            for (var i = 0; i < count; i++) {
+                                var typeDescr = methodType.parameterType(i); // type of i-th parameter
+                                var slot = cb.parameterSlot(i); // slot for i-th parameter
+
+                                cb.dup(); // arrayref
+                                cb.loadConstant(i); // index
+                                loadObjectWraper(cb, typeDescr, slot); // value
+                                cb.arrayStore(TypeKind.REFERENCE);
+                            }
+                            // cb.astore(1);
+                            var argsArr = cb.allocateLocal(TypeKind.REFERENCE);
+                            cb.localVariable(argsArr, "dbgArgsArr", ClassDesc.ofDescriptor("[Ljava/lang/Object;"), firstLabel, lastLabel);
+                            cb.astore(argsArr);
+                            cb.labelBinding(firstLabel);
                         }
                         var enterGenerated = false;
                         var localTypes = new HashMap<Integer, LocalVariableInfo>();
                         var locals = new HashMap<Integer, LocalVariableInfo>();
                         for (var instr : code.elementList()) {
-                            cb.with(instr);
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {
                                 if (localVar.typeSymbol() == ConstantDescs.CD_long || localVar.typeSymbol() == ConstantDescs.CD_double) {
@@ -76,13 +102,36 @@ final class JvmInsightTransform implements ClassTransform {
                                     }
                                 }
                             }
+                            /*
+                            if (instr instanceof LoadInstruction load) {
+                                if (load.slot() > 0 || isStatic) {
+                                    cb.aload(1); // array with locals
+                                    cb.loadConstant(load.slot()); // index
+                                    cb.arrayLoad(TypeKind.REFERENCE);
+                                    unwrapObjectWraper(load.typeKind());
+                                    continue;
+                                }
+                            }
+                            */
                             if (instr instanceof StoreInstruction store) {
                                 var initializedVar = localTypes.get(store.slot());
                                 if (initializedVar != null) {
                                     // initializedVar can be null when there is no debug info
                                     locals.put(store.slot(), initializedVar);
                                 }
+                                /*
+                                if (store.slot() > 0 || isStatic) {
+                                    wrapObjectWraper(cb, store.typeKind());
+                                    cb.aload(1); // array with locals
+                                    cb.loadConstant(store.slot());
+                                    cb.arrayStore(TypeKind.REFERENCE);
+                                    continue;
+                                }
+                                */
                             }
+
+                            cb.with(instr);
+
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
                                     onEnter("ROOTS", method, -1, locals.values(), cb);
@@ -104,6 +153,7 @@ final class JvmInsightTransform implements ClassTransform {
                                 onEnter("STATEMENTS", method, line.line(), locals.values(), cb);
                             }
                         }
+                        cb.labelBinding(lastLabel);
                     });
                 } else {
                     mb.with(me);
@@ -126,7 +176,7 @@ final class JvmInsightTransform implements ClassTransform {
         var argumentCount = 0;
         for (var l : locals) {
             cb.loadConstant(l.name().stringValue());
-            loadObjectWraper(cb, l);
+            loadObjectWraper(cb, l.typeSymbol(), l.slot());
             argumentCount += 2;
         }
         var Map = ClassDesc.of("java.util.Map");
@@ -137,9 +187,23 @@ final class JvmInsightTransform implements ClassTransform {
         cb.labelBinding(noCallback);
     }
 
-    private void loadObjectWraper(CodeBuilder cb, LocalVariableInfo l) {
-        var kind = TypeKind.fromDescriptor(l.typeSymbol().descriptorString());
-        cb.loadLocal(kind, l.slot());
+    private void loadObjectWraper(CodeBuilder cb, ClassDesc typeSymbol, int slot) {
+        var kind = TypeKind.fromDescriptor(typeSymbol.descriptorString());
+        cb.loadLocal(kind, slot);
+        wrapperToReference(cb, kind);
+    }
+
+    /**
+     * This method assumes there is a variable of type {@code kind} on the top
+     * of the stack and converts it to wrapper type. E.g. {@code int} is
+     * converted to {@link Integer}, etc. If the value isn't primitive, it
+     * stays as it is.
+     *
+     * @param cb code builder to emit instructions to
+     * @param kind the type of the variable on the stack
+     * @throws IllegalStateException if the {@code kind} isn't recognized
+     */
+    private static void wrapperToReference(CodeBuilder cb, TypeKind kind) throws IllegalStateException {
         switch (kind) {
             case BOOLEAN -> {
                 var type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
@@ -176,8 +240,20 @@ final class JvmInsightTransform implements ClassTransform {
             case REFERENCE -> {
                 // no conversion
             }
-            default -> throw new IllegalStateException("Unknown descriptor: " + l.typeSymbol().descriptorString());
+            default -> {
+                throw new IllegalStateException("Unknown kind: " + kind);
+            }
+
         }
+    }
+
+    private static int slotSize(ClassDesc desc) {
+        var type = TypeKind.fromDescriptor(desc.descriptorString());
+        return switch (type) {
+            case DOUBLE -> 2;
+            case LONG -> 2;
+            default -> 1;
+        };
     }
 
     private ConstantDesc fqn(ClassEntry clazz, MethodModel method, int line) {
