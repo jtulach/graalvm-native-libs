@@ -21,6 +21,7 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.CodeModel;
 import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
+import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.instruction.LineNumber;
@@ -91,7 +92,7 @@ final class JvmInsightTransform implements ClassTransform {
                                 while (it.hasNext()) {
                                     var en = it.next();
                                     if (
-                                        en.getValue() instanceof LocalVariable localVar 
+                                        en.getValue() instanceof LocalVariable localVar
                                         && localVar.endScope() == label
                                     ) {
                                         it.remove();
@@ -137,52 +138,45 @@ final class JvmInsightTransform implements ClassTransform {
     }
 
     private void loadObjectWraper(CodeBuilder cb, LocalVariableInfo l) {
-        if (l.typeSymbol().isPrimitive()) {
-            switch (l.typeSymbol().descriptorString()) {
-                case "Z" -> {
-                    cb.iload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
-                    cb.invokestatic(ConstantDescs.CD_Boolean, "valueOf", type);
-                }
-                case "B" -> {
-                    cb.iload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Byte, ConstantDescs.CD_byte);
-                    cb.invokestatic(ConstantDescs.CD_Byte, "valueOf", type);
-                }
-                case "C" -> {
-                    cb.iload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Character, ConstantDescs.CD_char);
-                    cb.invokestatic(ConstantDescs.CD_Character, "valueOf", type);
-                }
-                case "S" -> {
-                    cb.iload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Short, ConstantDescs.CD_short);
-                    cb.invokestatic(ConstantDescs.CD_Short, "valueOf", type);
-                }
-                case "I" -> {
-                    cb.iload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Integer, ConstantDescs.CD_int);
-                    cb.invokestatic(ConstantDescs.CD_Integer, "valueOf", type);
-                }
-                case "J" -> {
-                    cb.lload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Long, ConstantDescs.CD_long);
-                    cb.invokestatic(ConstantDescs.CD_Long, "valueOf", type);
-                }
-                case "F" -> {
-                    cb.fload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Float, ConstantDescs.CD_float);
-                    cb.invokestatic(ConstantDescs.CD_Float, "valueOf", type);
-                }
-                case "D" -> {
-                    cb.dload(l.slot());
-                    var type = MethodTypeDesc.of(ConstantDescs.CD_Double, ConstantDescs.CD_double);
-                    cb.invokestatic(ConstantDescs.CD_Double, "valueOf", type);
-                }
-                default -> throw new IllegalStateException("Unknown descriptor: " + l.typeSymbol().descriptorString());
+        var kind = TypeKind.fromDescriptor(l.typeSymbol().descriptorString());
+        cb.loadLocal(kind, l.slot());
+        switch (kind) {
+            case BOOLEAN -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
+                cb.invokestatic(ConstantDescs.CD_Boolean, "valueOf", type);
             }
-        } else {
-            cb.aload(l.slot());
+            case BYTE -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Byte, ConstantDescs.CD_byte);
+                cb.invokestatic(ConstantDescs.CD_Byte, "valueOf", type);
+            }
+            case CHAR -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Character, ConstantDescs.CD_char);
+                cb.invokestatic(ConstantDescs.CD_Character, "valueOf", type);
+            }
+            case SHORT -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Short, ConstantDescs.CD_short);
+                cb.invokestatic(ConstantDescs.CD_Short, "valueOf", type);
+            }
+            case INT -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Integer, ConstantDescs.CD_int);
+                cb.invokestatic(ConstantDescs.CD_Integer, "valueOf", type);
+            }
+            case LONG -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Long, ConstantDescs.CD_long);
+                cb.invokestatic(ConstantDescs.CD_Long, "valueOf", type);
+            }
+            case FLOAT -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Float, ConstantDescs.CD_float);
+                cb.invokestatic(ConstantDescs.CD_Float, "valueOf", type);
+            }
+            case DOUBLE -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_Double, ConstantDescs.CD_double);
+                cb.invokestatic(ConstantDescs.CD_Double, "valueOf", type);
+            }
+            case REFERENCE -> {
+                // no conversion
+            }
+            default -> throw new IllegalStateException("Unknown descriptor: " + l.typeSymbol().descriptorString());
         }
     }
 
