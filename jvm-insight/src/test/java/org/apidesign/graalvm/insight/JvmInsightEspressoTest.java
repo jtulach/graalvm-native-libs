@@ -108,11 +108,14 @@ public final class JvmInsightEspressoTest {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 print(`Invoked ${ctx.name} with n=${frame.n}`);
+                debugger;
             }, {
                 roots : true,
                 rootNameFilter : '.*fac.*'
             });
             """;
+        var warmUp = jvm.invokeFactorialMethodLong("fac", 6);
+        assertEquals(720, warmUp);
         try (
             var _ = jvm.applyInsight(ctx, insight, "print-n.js")
         ) {
@@ -188,7 +191,7 @@ public final class JvmInsightEspressoTest {
 
     @ParameterizedTest
     @EnumSource(JvmType.class)
-    public void testLocalVariableTypes(JvmType jvm) throws Exception {
+    public void testLocalVariableTypesStatic(JvmType jvm) throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 let sb = "";
@@ -210,6 +213,44 @@ public final class JvmInsightEspressoTest {
             var _ = jvm.applyInsight(ctx, insight, "all-types.js")
         ) {
             len = jvm.invokeFactorialMethodLong("allTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
+        }
+
+        var exp = Set.of(
+            "type_z:false", "type_b:4", "type_s:32", "type_i:48",
+            "type_l:6354", "type_c:X", "type_f:0.5", "type_d:2.7"
+        );
+        var act = Set.of(out.toString().trim().split(","));
+        assertEquals(exp, act, "Properly captured all arguments");
+        var allLen = exp.stream().map(s -> {
+            return s.split(":")[1].length();
+        }).reduce(0, (a, b) -> a + b);
+        assertEquals(allLen.intValue(), len, "Computed length is the same");
+    }
+
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void testLocalVariableTypesInstance(JvmType jvm) throws Exception {
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                let sb = "";
+                let sep = "";
+                for (let p in frame) {
+                    if (p.startsWith("type_")) {
+                        sb = sb + sep + p + ":" + frame[p];
+                        sep = ","
+                    }
+                }
+                print(sb);
+            }, {
+                roots : true,
+                rootNameFilter : '.*allInstanceTypes.*'
+            });
+            """;
+        long len;
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "all-types.js")
+        ) {
+            len = jvm.invokeFactorialInstanceMethodLong("allInstanceTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
         }
 
         var exp = Set.of(
@@ -275,14 +316,14 @@ public final class JvmInsightEspressoTest {
         final AutoCloseable applyInsight(Context ctx, String code, String name)
                 throws Exception {
             if (this == JVM) {
-                var init = """
+                var init = Source.newBuilder("js", """
                 (function(insight) {
                     return function(code) {
                         return eval(code);
                     }
                 })
-                """;
-                var initFn = ctx.eval("js", init);
+                """, "init.js").build();
+                var initFn = ctx.eval(init);
                 var jvmInsight = new Insight();
                 var evalFn = initFn.execute(jvmInsight);
                 evalFn.executeVoid(code);
@@ -313,6 +354,30 @@ public final class JvmInsightEspressoTest {
                                 continue;
                             }
                             var value = m.invoke(null, args);
+                            yield ((Number) value).longValue();
+                        }
+                        throw new IllegalStateException("Cannot find " + name);
+                    } catch (ReflectiveOperationException ex) {
+                        throw new IllegalStateException(ex);
+                    }
+                }
+            };
+        }
+
+        final long invokeFactorialInstanceMethodLong(String name, Object... args) {
+            return switch (this) {
+                case ESPRESSO -> {
+                    var inst = Factorial.newInstance();
+                    yield inst.invokeMember(name, args).asLong();
+                }
+                case JVM -> {
+                    try {
+                        var inst = FactorialHosted.getConstructor().newInstance();
+                        for (var m : FactorialHosted.getMethods()) {
+                            if (!m.getName().equals(name)) {
+                                continue;
+                            }
+                            var value = m.invoke(inst, args);
                             yield ((Number) value).longValue();
                         }
                         throw new IllegalStateException("Cannot find " + name);

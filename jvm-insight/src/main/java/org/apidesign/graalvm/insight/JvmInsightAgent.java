@@ -89,8 +89,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
                     }
                     case OPT_HANDLER -> {
                         var clazz = Class.forName(keyValue[1], true, ClassLoader.getSystemClassLoader());
-                        // @SuppressWarnings({"unchecked", "deprecation"})
-                        handler = (BiConsumer) clazz.newInstance();
+                        handler = (BiConsumer) clazz.getConstructor().newInstance();
                     }
                     default -> {
                         throw new IllegalStateException("Unknown option " + seg);

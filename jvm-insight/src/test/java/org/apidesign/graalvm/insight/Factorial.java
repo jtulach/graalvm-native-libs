@@ -17,8 +17,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
 
-public class Factorial {
-    private Factorial() {
+public final class Factorial {
+    public Factorial() {
     }
 
     public static int fac(int n) {
@@ -31,6 +31,16 @@ public class Factorial {
     }
 
     public static int allTypes(
+        String prefix,
+        boolean type_z, byte type_b, short type_s,
+        int type_i, long type_l, char type_c,
+        float type_f, double type_d
+    ) {
+        String txt = prefix + type_z + type_b + type_s + type_i + type_l + type_c + type_f + type_d;
+        return txt.length();
+    }
+
+    public int allInstanceTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,
         int type_i, long type_l, char type_c,
