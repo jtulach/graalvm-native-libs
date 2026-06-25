@@ -68,4 +68,18 @@ public class JvmInsightTest {
         assertEquals(120, res.intValue(), "Factorial is computed");
         assertEquals(15, sum[0], "Sum is being added to");
     }
+
+    @Test
+    public void testSimpleLocalValueReturn() throws Exception {
+        var method = FactorialHosted.getMethod("simpleReturn", int.class);
+        var res = method.invoke(null, 42);
+        assertEquals(42, res);
+    }
+
+    @Test
+    public void testSimpleLocalValueAssign() throws Exception {
+        var method = FactorialHosted.getMethod("simpleAssign", int.class);
+        var res = method.invoke(null, 6);
+        assertEquals(36, res);
+    }
 }

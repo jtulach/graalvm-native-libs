@@ -30,6 +30,15 @@ public final class Factorial {
         }
     }
 
+    public static int simpleReturn(int n) {
+        return n;
+    }
+
+    public static int simpleAssign(int n) {
+        var sum = n;
+        return sum * n;
+    }
+
     public static int allTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,

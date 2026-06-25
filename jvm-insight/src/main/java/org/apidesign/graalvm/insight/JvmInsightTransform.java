@@ -26,6 +26,7 @@ import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
 import java.lang.classfile.attribute.LocalVariableTableAttribute;
 import java.lang.classfile.constantpool.ClassEntry;
+import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LocalVariable;
@@ -66,6 +67,7 @@ final class JvmInsightTransform implements ClassTransform {
                         var lastLabel = cb.newLabel();
                         var methodType = method.methodTypeSymbol();
                         var count = methodType.parameterCount();
+                        int argsArr; // slot with reference to array with values
                         {
                             // copies all the values into an argument
                             cb.loadConstant(opt.get().localVariables().size());
@@ -79,9 +81,11 @@ final class JvmInsightTransform implements ClassTransform {
                                 loadObjectWraper(cb, typeDescr, slot); // value
                                 cb.arrayStore(TypeKind.REFERENCE);
                             }
-                            // cb.astore(1);
-                            var argsArr = cb.allocateLocal(TypeKind.REFERENCE);
-                            cb.localVariable(argsArr, "dbgArgsArr", ClassDesc.ofDescriptor("[Ljava/lang/Object;"), firstLabel, lastLabel);
+                            argsArr = cb.allocateLocal(TypeKind.REFERENCE);
+                            cb.localVariable(argsArr, "dbgArgsArr",
+                                ClassDesc.ofDescriptor("[Ljava/lang/Object;"),
+                                firstLabel, lastLabel
+                            );
                             cb.astore(argsArr);
                             cb.labelBinding(firstLabel);
                         }
@@ -102,32 +106,38 @@ final class JvmInsightTransform implements ClassTransform {
                                     }
                                 }
                             }
-                            /*
+
+                            var enableArgsArr = method.methodName().stringValue().startsWith("simple");
+
                             if (instr instanceof LoadInstruction load) {
-                                if (load.slot() > 0 || isStatic) {
-                                    cb.aload(1); // array with locals
-                                    cb.loadConstant(load.slot()); // index
-                                    cb.arrayLoad(TypeKind.REFERENCE);
-                                    unwrapObjectWraper(load.typeKind());
-                                    continue;
+                                if (enableArgsArr) {
+                                    if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
+                                        loadFromArray(cb, argsArr, load.typeKind(), load.slot());
+                                        continue;
+                                    }
                                 }
                             }
-                            */
                             if (instr instanceof StoreInstruction store) {
                                 var initializedVar = localTypes.get(store.slot());
                                 if (initializedVar != null) {
                                     // initializedVar can be null when there is no debug info
                                     locals.put(store.slot(), initializedVar);
                                 }
-                                /*
-                                if (store.slot() > 0 || isStatic) {
-                                    wrapObjectWraper(cb, store.typeKind());
-                                    cb.aload(1); // array with locals
-                                    cb.loadConstant(store.slot());
-                                    cb.arrayStore(TypeKind.REFERENCE);
+                                if (enableArgsArr) {
+                                    if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
+                                        storeToArray(cb, argsArr, store.typeKind(), store.slot());
+                                        continue;
+                                    }
+                                }
+                            }
+                            if (instr instanceof IncrementInstruction inc) {
+                                if (enableArgsArr) {
+                                    loadFromArray(cb, argsArr, TypeKind.INT, inc.slot());
+                                    cb.loadConstant(inc.constant());
+                                    cb.iadd();
+                                    storeToArray(cb, argsArr, TypeKind.INT, inc.slot());
                                     continue;
                                 }
-                                */
                             }
 
                             cb.with(instr);
@@ -165,6 +175,9 @@ final class JvmInsightTransform implements ClassTransform {
     }
 
     private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, CodeBuilder cb) {
+        if (method.methodName().stringValue().startsWith("simple")) {
+            return;
+        }
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
         var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite);
         var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass));
@@ -245,6 +258,90 @@ final class JvmInsightTransform implements ClassTransform {
             }
 
         }
+    }
+
+    /**
+     * This method assumes there is a wrapper type on the top
+     * of the stack and converts it to wrapper type. E.g. {@code Integer} is
+     * converted to {@link int}, etc. If the value isn't primitive, it
+     * stays as it is.
+     *
+     * @param cb code builder to emit instructions to
+     * @param kind the type of the variable on be on the stack
+     * @throws IllegalStateException if the {@code kind} isn't recognized
+     */
+    private static void wrapperToPrimitive(CodeBuilder cb, TypeKind kind) throws IllegalStateException {
+        switch (kind) {
+            case BOOLEAN -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_boolean);
+                cb.checkcast(ConstantDescs.CD_Boolean);
+                cb.invokevirtual(ConstantDescs.CD_Boolean, "booleanValue", type);
+            }
+            case BYTE -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_byte);
+                cb.checkcast(ConstantDescs.CD_Byte);
+                cb.invokevirtual(ConstantDescs.CD_Byte, "byteValue", type);
+            }
+            case CHAR -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_char);
+                cb.checkcast(ConstantDescs.CD_Character);
+                cb.invokevirtual(ConstantDescs.CD_Character, "charValue", type);
+            }
+            case SHORT -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_short);
+                cb.checkcast(ConstantDescs.CD_Short);
+                cb.invokevirtual(ConstantDescs.CD_Short, "shortValue", type);
+            }
+            case INT -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_int);
+                cb.checkcast(ConstantDescs.CD_Integer);
+                cb.invokevirtual(ConstantDescs.CD_Integer, "intValue", type);
+            }
+            case LONG -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_long);
+                cb.checkcast(ConstantDescs.CD_Long);
+                cb.invokevirtual(ConstantDescs.CD_Long, "longValue", type);
+            }
+            case FLOAT -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_float);
+                cb.checkcast(ConstantDescs.CD_Float);
+                cb.invokevirtual(ConstantDescs.CD_Float, "floatValue", type);
+            }
+            case DOUBLE -> {
+                var type = MethodTypeDesc.of(ConstantDescs.CD_double);
+                cb.checkcast(ConstantDescs.CD_Double);
+                cb.invokevirtual(ConstantDescs.CD_Double, "doubleValue", type);
+            }
+            case REFERENCE -> {
+                // no conversion
+            }
+            default -> {
+                throw new IllegalStateException("Unknown kind: " + kind);
+            }
+
+        }
+    }
+
+    private static void loadFromArray(CodeBuilder cb, int argsArr, TypeKind typeKind, int slot) throws IllegalStateException {
+        cb.aload(argsArr); // array with locals
+        cb.loadConstant(slot); // index
+        cb.arrayLoad(TypeKind.REFERENCE);
+        wrapperToPrimitive(cb, typeKind);
+    }
+
+    private void storeToArray(CodeBuilder cb, int argsArr, TypeKind typeKind, int slot) throws IllegalStateException {
+        cb.dup();
+        wrapperToReference(cb, typeKind); // convert to wrapper - 3rd arg
+
+        cb.aload(argsArr); // array with locals - 1st arg
+        cb.dup_x1();
+        cb.pop();
+
+        cb.loadConstant(slot); // index - 2nd arg
+        cb.dup_x1(); // copy value to store
+        cb.pop();
+
+        cb.arrayStore(TypeKind.REFERENCE);
     }
 
     private static int slotSize(ClassDesc desc) {
