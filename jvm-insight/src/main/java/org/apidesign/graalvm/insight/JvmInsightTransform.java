@@ -118,6 +118,9 @@ final class JvmInsightTransform implements ClassTransform {
                                     locals.put(store.slot(), initializedVar);
                                 }
                                 if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
+                                    if (!enableArgsArr) {
+                                        cb.dup();
+                                    }
                                     storeToArray(cb, argsArr, store.typeKind(), store.slot());
                                     if (enableArgsArr) {
                                         continue;
@@ -346,7 +349,6 @@ final class JvmInsightTransform implements ClassTransform {
     }
 
     private void storeToArray(CodeBuilder cb, int argsArr, TypeKind typeKind, int slot) throws IllegalStateException {
-        cb.dup();
         wrapperToReference(cb, typeKind); // convert to wrapper - 3rd arg
 
         cb.aload(argsArr); // array with locals - 1st arg

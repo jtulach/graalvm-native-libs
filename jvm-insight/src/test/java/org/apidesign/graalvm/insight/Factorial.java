@@ -39,6 +39,14 @@ public final class Factorial {
         return sum * n;
     }
 
+    public static int simpleFac(int n) {
+        var sum = 1;
+        for (var i = 1; i <= n; i++) {
+            sum = sum * i;
+        }
+        return sum;
+    }
+
     public static int allTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,

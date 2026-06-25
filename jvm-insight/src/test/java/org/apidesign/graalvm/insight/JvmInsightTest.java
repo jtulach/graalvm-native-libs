@@ -82,4 +82,11 @@ public class JvmInsightTest {
         var res = method.invoke(null, 6);
         assertEquals(36, res);
     }
+
+    @Test
+    public void testSimpleLoopFac() throws Exception {
+        var method = FactorialHosted.getMethod("simpleFac", int.class);
+        var res = method.invoke(null, 6);
+        assertEquals(720, res);
+    }
 }
