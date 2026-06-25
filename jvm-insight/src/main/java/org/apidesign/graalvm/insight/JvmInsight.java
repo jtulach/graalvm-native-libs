@@ -18,6 +18,7 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -100,11 +101,25 @@ public final class JvmInsight  {
         }
 
         public void call(BiConsumer<String, Map<String, Object>> handler) {
+            class Convertor implements BiConsumer<String, Map<String, Object>> {
+                @Override
+                public void accept(String t, Map<String, Object> data) {
+                    var names = (String[])data.get("names");
+                    var values = (Object[])data.get("values");
+                    var frame = new HashMap<String, Object>();
+                    for (var i = 0; i < names.length; i++) {
+                        if (names[i] != null) {
+                            frame.put(names[i], values[i]);
+                        }
+                    }
+                    handler.accept(t, frame);
+                }
+            }
             if (roots) {
-                ROOTS = handler;
+                ROOTS = new Convertor();
             }
             if (statements) {
-                STATEMENTS = handler;
+                STATEMENTS = new Convertor();
             }
         }
     }

@@ -66,7 +66,6 @@ final class JvmInsightTransform implements ClassTransform {
                         var firstLabel = cb.newLabel();
                         var lastLabel = cb.newLabel();
                         var methodType = method.methodTypeSymbol();
-                        var count = methodType.parameterCount();
                         int argsArr; // slot with reference to array with values
                         {
                             var mapOpt = opt.get().localVariables().stream().mapToInt(LocalVariableInfo::slot).max();
@@ -75,12 +74,12 @@ final class JvmInsightTransform implements ClassTransform {
                             // copies all the values into an argument
                             cb.loadConstant(maxSlotIndex);
                             cb.anewarray(ConstantDescs.CD_Object);
-                            for (var i = 0; i < count; i++) {
+                            for (var i = 0; i < methodType.parameterCount(); i++) {
                                 var typeDescr = methodType.parameterType(i); // type of i-th parameter
                                 var slot = cb.parameterSlot(i); // slot for i-th parameter
 
                                 cb.dup(); // arrayref
-                                cb.loadConstant(i); // index
+                                cb.loadConstant(slot); // index
                                 loadObjectWraper(cb, typeDescr, slot); // value
                                 cb.arrayStore(TypeKind.REFERENCE);
                             }
@@ -98,16 +97,8 @@ final class JvmInsightTransform implements ClassTransform {
                         for (var instr : code.elementList()) {
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {
-                                if (localVar.typeSymbol() == ConstantDescs.CD_long || localVar.typeSymbol() == ConstantDescs.CD_double) {
-                                    // long and double vars occupy two slots
-                                    count++;
-                                }
                                 localTypes.put(localVar.slot(), localVar);
-                                if (!localVar.name().equalsString("this")) {
-                                    if (localVar.slot() < count) {
-                                        locals.put(localVar.slot(), localVar);
-                                    }
-                                }
+                                locals.put(localVar.slot(), localVar);
                             }
 
                             var enableArgsArr = method.methodName().stringValue().startsWith("simple");
@@ -148,7 +139,7 @@ final class JvmInsightTransform implements ClassTransform {
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
                                     if (!enterGenerated) {
-                                        onEnter("ROOTS", method, -1, locals.values(), cb);
+                                        onEnter("ROOTS", method, -1, locals.values(), argsArr, cb);
                                     }
                                     enterGenerated = true;
                                 }
@@ -166,7 +157,7 @@ final class JvmInsightTransform implements ClassTransform {
                             }
                             if (instr instanceof LineNumber line) {
                                 if (!enableArgsArr) {
-                                    onEnter("STATEMENTS", method, line.line(), locals.values(), cb);
+                                    onEnter("STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
                                 }
                             }
                         }
@@ -181,7 +172,7 @@ final class JvmInsightTransform implements ClassTransform {
         }
     }
 
-    private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, CodeBuilder cb) {
+    private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, int argsArr, CodeBuilder cb) {
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
         var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite);
         var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass));
@@ -191,10 +182,31 @@ final class JvmInsightTransform implements ClassTransform {
         cb.invokedynamic(ref);
         cb.loadConstant(fqn(model.thisClass(), method, line));
         var argumentCount = 0;
-        for (var l : locals) {
-            cb.loadConstant(l.name().stringValue());
-            loadObjectWraper(cb, l.typeSymbol(), l.slot());
+
+        {
             argumentCount += 2;
+            // array with names
+            cb.loadConstant("names");
+
+            var maxOpt = locals.stream().mapToInt(LocalVariableInfo::slot).max();
+            var length = maxOpt.isPresent() ? maxOpt.getAsInt() + 1 : 0;
+
+            cb.loadConstant(length);
+            cb.anewarray(ConstantDescs.CD_String);
+
+            for (var l : locals) {
+                cb.dup(); // duplicate the array
+                cb.loadConstant(l.slot());
+                cb.loadConstant(l.name().stringValue());
+                cb.aastore();
+            }
+        }
+
+        {
+            argumentCount += 2;
+            // array with values
+            cb.loadConstant("values");
+            cb.aload(argsArr);
         }
         var Map = ClassDesc.of("java.util.Map");
         var ofArgsType = MethodTypeDesc.of(Map, Collections.nCopies(argumentCount, ConstantDescs.CD_Object));
@@ -346,15 +358,6 @@ final class JvmInsightTransform implements ClassTransform {
         cb.pop();
 
         cb.arrayStore(TypeKind.REFERENCE);
-    }
-
-    private static int slotSize(ClassDesc desc) {
-        var type = TypeKind.fromDescriptor(desc.descriptorString());
-        return switch (type) {
-            case DOUBLE -> 2;
-            case LONG -> 2;
-            default -> 1;
-        };
     }
 
     private ConstantDesc fqn(ClassEntry clazz, MethodModel method, int line) {
