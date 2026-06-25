@@ -69,8 +69,11 @@ final class JvmInsightTransform implements ClassTransform {
                         var count = methodType.parameterCount();
                         int argsArr; // slot with reference to array with values
                         {
+                            var mapOpt = opt.get().localVariables().stream().mapToInt(LocalVariableInfo::slot).max();
+                            var maxSlotIndex = mapOpt.isPresent() ? mapOpt.getAsInt() + 1 : 1;
+
                             // copies all the values into an argument
-                            cb.loadConstant(opt.get().localVariables().size());
+                            cb.loadConstant(maxSlotIndex);
                             cb.anewarray(ConstantDescs.CD_Object);
                             for (var i = 0; i < count; i++) {
                                 var typeDescr = methodType.parameterType(i); // type of i-th parameter
@@ -81,7 +84,7 @@ final class JvmInsightTransform implements ClassTransform {
                                 loadObjectWraper(cb, typeDescr, slot); // value
                                 cb.arrayStore(TypeKind.REFERENCE);
                             }
-                            argsArr = cb.allocateLocal(TypeKind.REFERENCE);
+                            argsArr = maxSlotIndex;
                             cb.localVariable(argsArr, "dbgArgsArr",
                                 ClassDesc.ofDescriptor("[Ljava/lang/Object;"),
                                 firstLabel, lastLabel
@@ -123,9 +126,9 @@ final class JvmInsightTransform implements ClassTransform {
                                     // initializedVar can be null when there is no debug info
                                     locals.put(store.slot(), initializedVar);
                                 }
-                                if (enableArgsArr) {
-                                    if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
-                                        storeToArray(cb, argsArr, store.typeKind(), store.slot());
+                                if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
+                                    storeToArray(cb, argsArr, store.typeKind(), store.slot());
+                                    if (enableArgsArr) {
                                         continue;
                                     }
                                 }
