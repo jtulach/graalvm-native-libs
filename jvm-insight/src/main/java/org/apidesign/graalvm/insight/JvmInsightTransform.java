@@ -107,6 +107,10 @@ final class JvmInsightTransform implements ClassTransform {
                                 if (enableArgsArr) {
                                     if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                         loadFromArray(cb, argsArr, load.typeKind(), load.slot());
+                                        if (load.typeKind() == TypeKind.REFERENCE) {
+                                            var type = localTypes.get(load.slot());
+                                            cb.checkcast(type.typeSymbol());
+                                        }
                                         continue;
                                     }
                                 }

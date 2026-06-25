@@ -47,6 +47,13 @@ public final class Factorial {
         return sum;
     }
 
+    public static String simpleConcat(String a, String b) {
+        var sb = new StringBuilder();
+        sb.append(a);
+        sb.append(b);
+        return sb.toString();
+    }
+
     public static int allTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,

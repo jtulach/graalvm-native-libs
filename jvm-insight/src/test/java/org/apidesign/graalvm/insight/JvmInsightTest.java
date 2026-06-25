@@ -89,4 +89,11 @@ public class JvmInsightTest {
         var res = method.invoke(null, 6);
         assertEquals(720, res);
     }
+
+    @Test
+    public void testSimpleConcat() throws Exception {
+        var method = FactorialHosted.getMethod("simpleConcat", String.class, String.class);
+        var res = method.invoke(null, "Hello ", "World!");
+        assertEquals("Hello World!", res);
+    }
 }
