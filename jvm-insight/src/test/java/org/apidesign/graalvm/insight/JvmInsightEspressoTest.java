@@ -265,6 +265,26 @@ public final class JvmInsightEspressoTest {
         assertEquals(allLen.intValue(), len, "Computed length is the same");
     }
 
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void testChangeLocalVariable(JvmType jvm) throws Exception {
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                frame.a = 6;
+                frame.b = 7;
+            }, {
+                roots : true,
+                rootNameFilter : '.*mul.*'
+            });
+            """;
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "change-locals.js")
+        ) {
+            var sixSeven= jvm.invokeFactorialMethodLong("mul", 5, 3);
+            assertEquals(42, sixSeven, "6 * 7 = 42");
+        }
+    }
+
     public enum JvmType {
         ESPRESSO, JVM;
 

@@ -65,6 +65,10 @@ public final class Factorial {
         return 42;
     }
 
+    public static int mul(int a, int b) {
+        return a * b;
+    }
+
     private static java.lang.invoke.CallSite meaningBootstrap(
         MethodHandles.Lookup lkp, String name, MethodType t
     ) {
