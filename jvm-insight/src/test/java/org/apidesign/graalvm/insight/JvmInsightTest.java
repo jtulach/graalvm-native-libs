@@ -91,6 +91,13 @@ public class JvmInsightTest {
     }
 
     @Test
+    public void testSimpleShortFac() throws Exception {
+        var method = FactorialHosted.getMethod("simpleShortFac", byte.class);
+        var res = method.invoke(null, (byte)4);
+        assertEquals((short)24, res);
+    }
+
+    @Test
     public void testSimpleConcat() throws Exception {
         var method = FactorialHosted.getMethod("simpleConcat", String.class, String.class);
         var res = method.invoke(null, "Hello ", "World!");

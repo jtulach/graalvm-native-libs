@@ -47,6 +47,15 @@ public final class Factorial {
         return sum;
     }
 
+    public static short simpleShortFac(byte n) {
+        short sum = 1;
+        while (n > 0) {
+            sum *= n;
+            n--;
+        }
+        return sum;
+    }
+
     public static String simpleConcat(String a, String b) {
         var sb = new StringBuilder();
         sb.append(a);
