@@ -147,7 +147,9 @@ final class JvmInsightTransform implements ClassTransform {
 
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
-                                    onEnter("ROOTS", method, -1, locals.values(), cb);
+                                    if (!enterGenerated) {
+                                        onEnter("ROOTS", method, -1, locals.values(), cb);
+                                    }
                                     enterGenerated = true;
                                 }
                                 var it = localTypes.entrySet().iterator();
@@ -163,7 +165,9 @@ final class JvmInsightTransform implements ClassTransform {
                                 }
                             }
                             if (instr instanceof LineNumber line) {
-                                onEnter("STATEMENTS", method, line.line(), locals.values(), cb);
+                                if (!enableArgsArr) {
+                                    onEnter("STATEMENTS", method, line.line(), locals.values(), cb);
+                                }
                             }
                         }
                         cb.labelBinding(lastLabel);
@@ -178,9 +182,6 @@ final class JvmInsightTransform implements ClassTransform {
     }
 
     private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, CodeBuilder cb) {
-        if (method.methodName().stringValue().startsWith("simple")) {
-            return;
-        }
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
         var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite);
         var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass));
