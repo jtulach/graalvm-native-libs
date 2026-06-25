@@ -106,11 +106,9 @@ final class JvmInsightTransform implements ClassTransform {
                             if (instr instanceof LoadInstruction load) {
                                 if (enableArgsArr) {
                                     if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
-                                        loadFromArray(cb, argsArr, load.typeKind(), load.slot());
-                                        if (load.typeKind() == TypeKind.REFERENCE) {
-                                            var type = localTypes.get(load.slot());
-                                            cb.checkcast(type.typeSymbol());
-                                        }
+                                        var info = localTypes.get(load.slot());
+                                        var type = info.typeSymbol();
+                                        loadFromArray(cb, argsArr, type, load.slot());
                                         continue;
                                     }
                                 }
@@ -125,7 +123,9 @@ final class JvmInsightTransform implements ClassTransform {
                                     if (!enableArgsArr) {
                                         cb.dup();
                                     }
-                                    storeToArray(cb, argsArr, store.typeKind(), store.slot());
+                                    var info = localTypes.get(store.slot());
+                                    var type = info.typeSymbol();
+                                    storeToArray(cb, argsArr, type, store.slot());
                                     if (enableArgsArr) {
                                         continue;
                                     }
@@ -133,10 +133,10 @@ final class JvmInsightTransform implements ClassTransform {
                             }
                             if (instr instanceof IncrementInstruction inc) {
                                 if (enableArgsArr) {
-                                    loadFromArray(cb, argsArr, TypeKind.INT, inc.slot());
+                                    loadFromArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
                                     cb.loadConstant(inc.constant());
                                     cb.iadd();
-                                    storeToArray(cb, argsArr, TypeKind.INT, inc.slot());
+                                    storeToArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
                                     continue;
                                 }
                             }
@@ -226,7 +226,7 @@ final class JvmInsightTransform implements ClassTransform {
     private void loadObjectWraper(CodeBuilder cb, ClassDesc typeSymbol, int slot) {
         var kind = TypeKind.fromDescriptor(typeSymbol.descriptorString());
         cb.loadLocal(kind, slot);
-        wrapperToReference(cb, kind);
+        wrapperToReference(cb, typeSymbol);
     }
 
     /**
@@ -239,7 +239,8 @@ final class JvmInsightTransform implements ClassTransform {
      * @param kind the type of the variable on the stack
      * @throws IllegalStateException if the {@code kind} isn't recognized
      */
-    private static void wrapperToReference(CodeBuilder cb, TypeKind kind) throws IllegalStateException {
+    private static void wrapperToReference(CodeBuilder cb, ClassDesc expType) throws IllegalStateException {
+        var kind = TypeKind.fromDescriptor(expType.descriptorString());
         switch (kind) {
             case BOOLEAN -> {
                 var type = MethodTypeDesc.of(ConstantDescs.CD_Boolean, ConstantDescs.CD_boolean);
@@ -290,10 +291,11 @@ final class JvmInsightTransform implements ClassTransform {
      * stays as it is.
      *
      * @param cb code builder to emit instructions to
-     * @param kind the type of the variable on be on the stack
+     * @param wrapperType the type of the variable on be on the stack
      * @throws IllegalStateException if the {@code kind} isn't recognized
      */
-    private static void wrapperToPrimitive(CodeBuilder cb, TypeKind kind) throws IllegalStateException {
+    private static void wrapperToPrimitive(CodeBuilder cb, ClassDesc wraperType) throws IllegalStateException {
+        var kind = TypeKind.fromDescriptor(wraperType.descriptorString());
         switch (kind) {
             case BOOLEAN -> {
                 var type = MethodTypeDesc.of(ConstantDescs.CD_boolean);
@@ -336,7 +338,8 @@ final class JvmInsightTransform implements ClassTransform {
                 cb.invokevirtual(ConstantDescs.CD_Double, "doubleValue", type);
             }
             case REFERENCE -> {
-                // no conversion
+                // no conversion, but check for proper type
+                cb.checkcast(wraperType);
             }
             default -> {
                 throw new IllegalStateException("Unknown kind: " + kind);
@@ -345,15 +348,15 @@ final class JvmInsightTransform implements ClassTransform {
         }
     }
 
-    private static void loadFromArray(CodeBuilder cb, int argsArr, TypeKind typeKind, int slot) throws IllegalStateException {
+    private static void loadFromArray(CodeBuilder cb, int argsArr, ClassDesc type, int slot) throws IllegalStateException {
         cb.aload(argsArr); // array with locals
         cb.loadConstant(slot); // index
         cb.arrayLoad(TypeKind.REFERENCE);
-        wrapperToPrimitive(cb, typeKind);
+        wrapperToPrimitive(cb, type);
     }
 
-    private void storeToArray(CodeBuilder cb, int argsArr, TypeKind typeKind, int slot) throws IllegalStateException {
-        wrapperToReference(cb, typeKind); // convert to wrapper - 3rd arg
+    private void storeToArray(CodeBuilder cb, int argsArr, ClassDesc type, int slot) throws IllegalStateException {
+        wrapperToReference(cb, type); // convert to wrapper - 3rd arg
 
         cb.aload(argsArr); // array with locals - 1st arg
         cb.dup_x1();
