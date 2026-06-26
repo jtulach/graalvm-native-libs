@@ -113,6 +113,11 @@ public final class JvmInsight  {
                         }
                     }
                     handler.accept(t, frame);
+                    for (var i = 0; i < names.length; i++) {
+                        if (names[i] != null) {
+                            values[i] = frame.get(names[i]);
+                        }
+                    }
                 }
             }
             if (roots) {

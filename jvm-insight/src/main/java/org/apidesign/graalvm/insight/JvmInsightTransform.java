@@ -100,17 +100,12 @@ final class JvmInsightTransform implements ClassTransform {
                                 localTypes.put(localVar.slot(), localVar);
                                 locals.put(localVar.slot(), localVar);
                             }
-
-                            var enableArgsArr = method.methodName().stringValue().startsWith("simple");
-
                             if (instr instanceof LoadInstruction load) {
-                                if (enableArgsArr) {
-                                    if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
-                                        var info = localTypes.get(load.slot());
-                                        var type = info.typeSymbol();
-                                        loadFromArray(cb, argsArr, type, load.slot());
-                                        continue;
-                                    }
+                                if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
+                                    var info = localTypes.get(load.slot());
+                                    var type = info.typeSymbol();
+                                    loadFromArray(cb, argsArr, type, load.slot());
+                                    continue;
                                 }
                             }
                             if (instr instanceof StoreInstruction store) {
@@ -120,34 +115,25 @@ final class JvmInsightTransform implements ClassTransform {
                                     locals.put(store.slot(), initializedVar);
                                 }
                                 if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
-                                    if (!enableArgsArr) {
-                                        cb.dup();
-                                    }
                                     var info = localTypes.get(store.slot());
                                     var type = info.typeSymbol();
                                     storeToArray(cb, argsArr, type, store.slot());
-                                    if (enableArgsArr) {
-                                        continue;
-                                    }
+                                    continue;
                                 }
                             }
                             if (instr instanceof IncrementInstruction inc) {
-                                if (enableArgsArr) {
-                                    loadFromArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
-                                    cb.loadConstant(inc.constant());
-                                    cb.iadd();
-                                    storeToArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
-                                    continue;
-                                }
+                                loadFromArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
+                                cb.loadConstant(inc.constant());
+                                cb.iadd();
+                                storeToArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
+                                continue;
                             }
 
                             cb.with(instr);
 
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
-                                    if (!enterGenerated) {
-                                        onEnter("ROOTS", method, -1, locals.values(), argsArr, cb);
-                                    }
+                                    onEnter("ROOTS", method, -1, locals.values(), argsArr, cb);
                                     enterGenerated = true;
                                 }
                                 var it = localTypes.entrySet().iterator();
@@ -163,9 +149,7 @@ final class JvmInsightTransform implements ClassTransform {
                                 }
                             }
                             if (instr instanceof LineNumber line) {
-                                if (!enableArgsArr) {
-                                    onEnter("STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
-                                }
+                                onEnter("STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
                             }
                         }
                         cb.labelBinding(lastLabel);
