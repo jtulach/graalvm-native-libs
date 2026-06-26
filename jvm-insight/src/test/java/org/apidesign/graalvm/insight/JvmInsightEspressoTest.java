@@ -16,12 +16,14 @@ package org.apidesign.graalvm.insight;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.net.URL;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
@@ -310,6 +312,57 @@ public final class JvmInsightEspressoTest {
         }
     }
 
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void testConcatStepByStep(JvmType jvm) throws Exception {
+        var insight = """
+            function printDump(msg, frame) {
+                let sb = msg;
+                let sep = "";
+                for (let p in frame) {
+                    sb = sb + sep + p + ":" + frame[p];
+                    sep = ","
+                }
+                print(sb);
+            }
+
+            insight.on('enter', (ctx, frame) => {
+                printDump(`Method entered ${ctx.name}`, frame);
+            }, {
+                roots : true,
+                rootNameFilter : '.*simpleConcat.*'
+            });
+            insight.on('return', (ctx, frame) => {
+                printDump(`Method exited ${ctx.name}`, {}); // should be frame ...
+                      // ... but Espresso is not using proper argument names here
+            }, {
+                roots : true,
+                rootNameFilter : '.*simpleConcat.*'
+            });
+
+            insight.on('return', (ctx, frame) => {
+                printDump("Step over: ", frame);
+            }, {
+                statements : true,
+                rootNameFilter : '.*simpleConcat.*'
+            });
+            """;
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "step-over.js")
+        ) {
+            var hi= jvm.invokeFactorialMethodString("simpleConcat", "Hi", "There!");
+            assertEquals("HiThere!", hi);
+        }
+        assertEquals("""
+        Method entered Lorg/apidesign/graalvm/insight/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;a:Hi,b:There!
+        Step over: a:Hi,b:There!
+        Step over: a:Hi,b:There!,sb:Hi
+        Step over: a:Hi,b:There!,sb:HiThere!
+        Step over: a:Hi,b:There!,sb:HiThere!
+        Method exited Lorg/apidesign/graalvm/insight/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+        """, out.toString(), "Properly captured output while stepping thru the function");
+    }
+
     public enum JvmType {
         ESPRESSO, JVM;
 
@@ -342,7 +395,17 @@ public final class JvmInsightEspressoTest {
                     var methodName = where.substring(lineSep + 1);
                     if (rootNameFilter == null || rootNameFilter.matcher(methodName).matches()) {
                         var ctx = new Ctx(methodName, line);
-                        fn.apply(ctx, frame);
+                        var txtFrame = new LinkedHashMap<String, Object>();
+                        var needsTxtFrame = false;
+                        for (var en : frame.entrySet()) {
+                            if (en.getValue() instanceof StringBuilder sb) {
+                                needsTxtFrame = true;
+                                txtFrame.put(en.getKey(), sb.toString());
+                            } else {
+                                txtFrame.put(en.getKey(), en.getValue());
+                            }
+                        }
+                        fn.apply(ctx, needsTxtFrame ? txtFrame : frame);
                     }
                 };
                 handle = JvmInsight.apply((insight) -> {
@@ -405,6 +468,26 @@ public final class JvmInsightEspressoTest {
                             }
                             var value = m.invoke(null, args);
                             yield ((Number) value).longValue();
+                        }
+                        throw new IllegalStateException("Cannot find " + name);
+                    } catch (ReflectiveOperationException ex) {
+                        throw new IllegalStateException(ex);
+                    }
+                }
+            };
+        }
+
+        final String invokeFactorialMethodString(String name, Object... args) {
+            return switch (this) {
+                case ESPRESSO -> Factorial.invokeMember(name, args).asString();
+                case JVM -> {
+                    try {
+                        for (var m : FactorialHosted.getMethods()) {
+                            if (!m.getName().equals(name)) {
+                                continue;
+                            }
+                            var value = m.invoke(null, args);
+                            yield (String) value;
                         }
                         throw new IllegalStateException("Cannot find " + name);
                     } catch (ReflectiveOperationException ex) {
