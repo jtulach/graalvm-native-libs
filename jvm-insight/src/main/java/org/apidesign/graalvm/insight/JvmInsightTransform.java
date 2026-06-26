@@ -25,7 +25,6 @@ import java.lang.classfile.MethodModel;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
 import java.lang.classfile.attribute.LocalVariableTableAttribute;
-import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
@@ -33,7 +32,6 @@ import java.lang.classfile.instruction.LocalVariable;
 import java.lang.classfile.instruction.ReturnInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
-import java.lang.constant.ConstantDesc;
 import java.lang.constant.ConstantDescs;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
@@ -254,12 +252,18 @@ final class JvmInsightTransform implements ClassTransform {
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
         var boot = ConstantDescs.ofCallsiteBootstrap(
             insightClazz, "metafactory", ConstantDescs.CD_CallSite,
-            ConstantDescs.CD_String, ConstantDescs.CD_String, ConstantDescs.CD_int
+            ConstantDescs.CD_String, ConstantDescs.CD_Class,
+            ConstantDescs.CD_String, ConstantDescs.CD_String,
+            ConstantDescs.CD_int
         );
+        var thizClass = model.thisClass().constantValue();
         var ref = DynamicCallSiteDesc.of(
             boot, fieldName,
             MethodTypeDesc.of(callbackClass),
-            type, fqn(model.thisClass(), method, line), line);
+            type, thizClass,
+            method.methodName().stringValue(), method.methodTypeSymbol().descriptorString(),
+            line
+        );
         cb.invokedynamic(ref);
         var noCallback = cb.newLabel();
         cb.ifnull(noCallback);
@@ -431,10 +435,5 @@ final class JvmInsightTransform implements ClassTransform {
         cb.pop();
 
         cb.arrayStore(TypeKind.REFERENCE);
-    }
-
-    private ConstantDesc fqn(ClassEntry clazz, MethodModel method, int line) {
-        var methodName = "L" + clazz.asInternalName() + ";." + method.methodName() + method.methodTypeSymbol().descriptorString();
-        return methodName;
     }
 }

@@ -153,22 +153,38 @@ public final class JvmInsight  {
      * @param type requested method type
      * @param when which kind of event this call site shall trigger
      *    - {@code "enter"} or {@code "return"}
+     * @param clazz class that contains the instrumented method
+     * @param methodName name of the instrumented method
+     * @param methodDescriptor descriptor of the method
+     * @param line line number in the method or {@code -1} if it is not specified
      * @return the callsite
      * @throws IllegalArgumentException if the {@code name} isn't recognized
      */
     public static CallSite metafactory(
         MethodHandles.Lookup lkp, String name, MethodType type,
-        String when, String method, int line
+        String when, Class<?> clazz, String methodName, String methodDescriptor,
+        int line
     ) {
         try {
             var myLkp = MethodHandles.lookup();
-            var rawHandle = myLkp.findStatic(JvmInsight.class, name, MethodType.methodType(Consumer.class, Builder.When.class, String.class));
+            var rawHandle = myLkp.findStatic(
+                JvmInsight.class, name,
+                MethodType.methodType(
+                    Consumer.class,
+                    Builder.When.class,
+                    String.class
+                )
+            );
             var handle = switch (when) {
                 case "enter" -> rawHandle.bindTo(Builder.When.ENTER);
                 case "return" -> rawHandle.bindTo(Builder.When.RETURN);
                 default -> throw new IllegalArgumentException(when);
             };
-            var fqn = line + ":" + method;
+            var fqn = line + ":L"
+                + clazz.getName().replace('.', '/')
+                + ";." + methodName
+                + methodDescriptor;
+
             var consumer = handle.bindTo(fqn);
             return new ConstantCallSite(consumer);
         } catch (NoSuchMethodException | IllegalAccessException ex) {
