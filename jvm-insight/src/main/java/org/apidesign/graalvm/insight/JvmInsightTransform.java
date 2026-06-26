@@ -50,7 +50,7 @@ final class JvmInsightTransform implements ClassTransform {
 
     public JvmInsightTransform(ClassModel clazz) {
         this.model = clazz;
-        this.callbackClass = ClassDesc.of("java.util.function.BiConsumer");
+        this.callbackClass = ClassDesc.of("java.util.function.Consumer");
     }
 
     @Override
@@ -252,13 +252,18 @@ final class JvmInsightTransform implements ClassTransform {
 
     private void onHook(String type, String fieldName, MethodModel method, int line, int argsNames, int argsArr, CodeBuilder cb) {
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
-        var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite, ConstantDescs.CD_String);
-        var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass), type);
+        var boot = ConstantDescs.ofCallsiteBootstrap(
+            insightClazz, "metafactory", ConstantDescs.CD_CallSite,
+            ConstantDescs.CD_String, ConstantDescs.CD_String, ConstantDescs.CD_int
+        );
+        var ref = DynamicCallSiteDesc.of(
+            boot, fieldName,
+            MethodTypeDesc.of(callbackClass),
+            type, fqn(model.thisClass(), method, line), line);
         cb.invokedynamic(ref);
         var noCallback = cb.newLabel();
         cb.ifnull(noCallback);
         cb.invokedynamic(ref);
-        cb.loadConstant(fqn(model.thisClass(), method, line));
         var argumentCount = 0;
 
         {
@@ -277,7 +282,7 @@ final class JvmInsightTransform implements ClassTransform {
         var Map = ClassDesc.of("java.util.Map");
         var ofArgsType = MethodTypeDesc.of(Map, Collections.nCopies(argumentCount, ConstantDescs.CD_Object));
         cb.invokestatic(Map, "of", ofArgsType, true);
-        var consumeType = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object, ConstantDescs.CD_Object);
+        var consumeType = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object);
         cb.invokeinterface(callbackClass, "accept", consumeType);
         cb.labelBinding(noCallback);
     }
@@ -430,6 +435,6 @@ final class JvmInsightTransform implements ClassTransform {
 
     private ConstantDesc fqn(ClassEntry clazz, MethodModel method, int line) {
         var methodName = "L" + clazz.asInternalName() + ";." + method.methodName() + method.methodTypeSymbol().descriptorString();
-        return "" + line + ":" + methodName;
+        return methodName;
     }
 }

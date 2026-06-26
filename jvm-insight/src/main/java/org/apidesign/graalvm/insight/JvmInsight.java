@@ -157,27 +157,32 @@ public final class JvmInsight  {
      * @throws IllegalArgumentException if the {@code name} isn't recognized
      */
     public static CallSite metafactory(
-        MethodHandles.Lookup lkp, String name, MethodType type, String when
+        MethodHandles.Lookup lkp, String name, MethodType type,
+        String when, String method, int line
     ) {
         try {
             var myLkp = MethodHandles.lookup();
-            var rawHandle = myLkp.findStatic(JvmInsight.class, name, MethodType.methodType(BiConsumer.class, Builder.When.class));
+            var rawHandle = myLkp.findStatic(JvmInsight.class, name, MethodType.methodType(Consumer.class, Builder.When.class, String.class));
             var handle = switch (when) {
                 case "enter" -> rawHandle.bindTo(Builder.When.ENTER);
                 case "return" -> rawHandle.bindTo(Builder.When.RETURN);
                 default -> throw new IllegalArgumentException(when);
             };
-            return new ConstantCallSite(handle);
+            var fqn = line + ":" + method;
+            var consumer = handle.bindTo(fqn);
+            return new ConstantCallSite(consumer);
         } catch (NoSuchMethodException | IllegalAccessException ex) {
             throw new IllegalArgumentException(ex);
         }
     }
 
-    private static BiConsumer<String, Map<String, Object>> roots(Builder.When when) {
-        return ROOTS.get(when);
+    private static Consumer<Map<String, Object>> roots(Builder.When when, String fqn) {
+        var bic = ROOTS.get(when);
+        return bic == null ? null : (value) -> bic.accept(fqn, value);
     }
 
-    private static BiConsumer<String, Map<String, Object>> statements(Builder.When when) {
-        return STATEMENTS.get(when);
+    private static Consumer<Map<String, Object>> statements(Builder.When when, String fqn) {
+        var bic = STATEMENTS.get(when);
+        return bic == null ? null : (value) -> bic.accept(fqn, value);
     }
 }
