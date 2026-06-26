@@ -112,7 +112,7 @@ final class JvmInsightTransform implements ClassTransform {
 
                             final void endOfLine() {
                                 if (lastLine != null) {
-                                    onHook("return", "STATEMENTS", method, lastLine.line(), locals.values(), argsArr, cb);
+                                    onHook("return", "statements", method, lastLine.line(), locals.values(), argsArr, cb);
                                     lastLine = null;
                                 }
                             }
@@ -155,14 +155,14 @@ final class JvmInsightTransform implements ClassTransform {
                             }
                             if (instr instanceof ReturnInstruction ret) {
                                 endOfStatement.endOfLine();
-                                onHook("return", "ROOTS", method, -1, locals.values(), argsArr, cb);
+                                onHook("return", "roots", method, -1, locals.values(), argsArr, cb);
                             }
 
                             cb.with(instr);
 
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
-                                    onHook("enter", "ROOTS", method, -1, locals.values(), argsArr, cb);
+                                    onHook("enter", "roots", method, -1, locals.values(), argsArr, cb);
                                     enterGenerated = true;
                                 }
                                 var it = localTypes.entrySet().iterator();
@@ -177,7 +177,7 @@ final class JvmInsightTransform implements ClassTransform {
                             if (instr instanceof LineNumber line) {
                                 endOfStatement.endOfLine();
                                 endOfStatement.lastLine = line;
-                                onHook("enter", "STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
+                                onHook("enter", "statements", method, line.line(), locals.values(), argsArr, cb);
                             }
                         }
                         cb.labelBinding(lastLabel);

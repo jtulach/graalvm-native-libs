@@ -161,18 +161,14 @@ public final class JvmInsight  {
     ) {
         try {
             var myLkp = MethodHandles.lookup();
-            var rawHandle = switch (name) {
-                case "ROOTS" -> myLkp.findStatic(JvmInsight.class, "roots", MethodType.methodType(BiConsumer.class, Builder.When.class));
-                case "STATEMENTS" -> myLkp.findStatic(JvmInsight.class, "statements", MethodType.methodType(BiConsumer.class, Builder.When.class));
-                default -> throw new NoSuchFieldException(name);
-            };
+            var rawHandle = myLkp.findStatic(JvmInsight.class, name, MethodType.methodType(BiConsumer.class, Builder.When.class));
             var handle = switch (when) {
                 case "enter" -> rawHandle.bindTo(Builder.When.ENTER);
                 case "return" -> rawHandle.bindTo(Builder.When.RETURN);
                 default -> throw new IllegalArgumentException(when);
             };
             return new ConstantCallSite(handle);
-        } catch (NoSuchMethodException | NoSuchFieldException | IllegalAccessException ex) {
+        } catch (NoSuchMethodException | IllegalAccessException ex) {
             throw new IllegalArgumentException(ex);
         }
     }
