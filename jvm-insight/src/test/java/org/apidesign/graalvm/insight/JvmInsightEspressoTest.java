@@ -134,6 +134,31 @@ public final class JvmInsightEspressoTest {
 
     @ParameterizedTest
     @EnumSource(JvmType.class)
+    public void onReturnHook(JvmType jvm) throws Exception {
+        var insight = """
+            insight.on('return', (ctx, frame) => {
+                print(`Computed for ${frame.n}. Factorial is ${frame.sum}.`);
+            }, {
+                roots : true,
+                rootNameFilter : '.*simpleFac.*'
+            });
+            """;
+        var warmUp = jvm.invokeFactorialMethodLong("simpleFac", 6);
+        assertEquals(720, warmUp);
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "print-sum.js")
+        ) {
+            var res = jvm.invokeFactorialMethodLong("simpleFac", 5);
+            assertEquals(120, res);
+        }
+
+        assertEquals("""
+        Computed for 5. Factorial is 120.
+        """, out.toString(), "Properly captured five invocation of fac(n)");
+    }
+
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
     public void trackStatementsEgLines(JvmType jvm) throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
@@ -322,6 +347,11 @@ public final class JvmInsightEspressoTest {
                 };
                 handle = JvmInsight.apply((insight) -> {
                     var bldr = insight.on(FactorialHosted);
+                    switch (type) {
+                        case "enter" -> bldr.when(JvmInsight.Builder.When.ENTER);
+                        case "return" -> bldr.when(JvmInsight.Builder.When.RETURN);
+                        default -> throw new IllegalStateException(type);
+                    }
                     if (Boolean.TRUE.equals(cfg.get("roots"))) {
                         bldr.roots();
                     }

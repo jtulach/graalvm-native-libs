@@ -30,6 +30,7 @@ import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LocalVariable;
+import java.lang.classfile.instruction.ReturnInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDesc;
@@ -128,12 +129,15 @@ final class JvmInsightTransform implements ClassTransform {
                                 storeToArray(cb, argsArr, ConstantDescs.CD_int, inc.slot());
                                 continue;
                             }
+                            if (instr instanceof ReturnInstruction ret) {
+                                onHook("return", "ROOTS", method, -1, locals.values(), argsArr, cb);
+                            }
 
                             cb.with(instr);
 
                             if (instr instanceof Label label) {
                                 if (!enterGenerated) {
-                                    onEnter("ROOTS", method, -1, locals.values(), argsArr, cb);
+                                    onHook("enter", "ROOTS", method, -1, locals.values(), argsArr, cb);
                                     enterGenerated = true;
                                 }
                                 var it = localTypes.entrySet().iterator();
@@ -149,7 +153,7 @@ final class JvmInsightTransform implements ClassTransform {
                                 }
                             }
                             if (instr instanceof LineNumber line) {
-                                onEnter("STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
+                                onHook("enter", "STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
                             }
                         }
                         cb.labelBinding(lastLabel);
@@ -163,10 +167,10 @@ final class JvmInsightTransform implements ClassTransform {
         }
     }
 
-    private void onEnter(String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, int argsArr, CodeBuilder cb) {
+    private void onHook(String type, String fieldName, MethodModel method, int line, Collection<LocalVariableInfo> locals, int argsArr, CodeBuilder cb) {
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
-        var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite);
-        var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass));
+        var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite, ConstantDescs.CD_String);
+        var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass), type);
         cb.invokedynamic(ref);
         var noCallback = cb.newLabel();
         cb.ifnull(noCallback);

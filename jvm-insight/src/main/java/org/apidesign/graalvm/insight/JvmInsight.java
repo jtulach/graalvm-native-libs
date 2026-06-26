@@ -18,14 +18,16 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 public final class JvmInsight  {
-    private static BiConsumer<String, Map<String, Object>> ROOTS;
+    private static final Map<Builder.When, BiConsumer<String, Map<String, Object>>> ROOTS = new EnumMap<>(Builder.When.class);
     private static BiConsumer<String, Map<String, Object>> STATEMENTS;
 
     private JvmInsight() {
@@ -42,7 +44,7 @@ public final class JvmInsight  {
     public static AutoCloseable apply(Consumer<JvmInsight> block) {
         block.accept(new JvmInsight());
         return () -> {
-            ROOTS = null;
+            ROOTS.clear();
             STATEMENTS = null;
         };
     }
@@ -80,9 +82,20 @@ public final class JvmInsight  {
         private boolean statements;
         private boolean roots;
         private Pattern methodFilter;
+        private When when = When.ENTER;
 
         private Builder(Class<?> clazz) {
             this.clazz = clazz;
+        }
+
+        public enum When {
+            ENTER, RETURN;
+        }
+
+        public Builder when(When type) {
+            Objects.requireNonNull(type);
+            this.when = type;
+            return this;
         }
 
         public Builder roots() {
@@ -121,7 +134,7 @@ public final class JvmInsight  {
                 }
             }
             if (roots) {
-                ROOTS = new Convertor();
+                ROOTS.put(when, new Convertor());
             }
             if (statements) {
                 STATEMENTS = new Convertor();
@@ -138,16 +151,25 @@ public final class JvmInsight  {
      * @param name name of the configuration to fetch
      *    - either {@code "ROOTS"} or {@code "STATEMENTS"}.
      * @param type requested method type
+     * @param when which kind of event this call site shall trigger
+     *    - {@code "enter"} or {@code "return"}
      * @return the callsite
      * @throws IllegalArgumentException if the {@code name} isn't recognized
      */
     public static CallSite metafactory(
-        MethodHandles.Lookup lkp, String name, MethodType type
+        MethodHandles.Lookup lkp, String name, MethodType type, String when
     ) {
         try {
             var myLkp = MethodHandles.lookup();
             var handle = switch (name) {
-                case "ROOTS" -> myLkp.findStatic(JvmInsight.class, "roots", MethodType.methodType(BiConsumer.class));
+                case "ROOTS" -> {
+                    var roots = myLkp.findStatic(JvmInsight.class, "roots", MethodType.methodType(BiConsumer.class, Builder.When.class));
+                    yield switch (when) {
+                        case "enter" -> roots.bindTo(Builder.When.ENTER);
+                        case "return" -> roots.bindTo(Builder.When.RETURN);
+                        default -> throw new IllegalArgumentException(when);
+                    };
+                }
                 case "STATEMENTS" -> myLkp.findStatic(JvmInsight.class, "statements", MethodType.methodType(BiConsumer.class));
                 default -> throw new NoSuchFieldException(name);
             };
@@ -157,8 +179,8 @@ public final class JvmInsight  {
         }
     }
 
-    private static BiConsumer<String, Map<String, Object>> roots() {
-        return ROOTS;
+    private static BiConsumer<String, Map<String, Object>> roots(Builder.When when) {
+        return ROOTS.get(when);
     }
 
     private static BiConsumer<String, Map<String, Object>> statements() {
