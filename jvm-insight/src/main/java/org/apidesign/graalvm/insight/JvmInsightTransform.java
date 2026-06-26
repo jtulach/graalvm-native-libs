@@ -38,7 +38,6 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Optional;
@@ -71,6 +70,7 @@ final class JvmInsightTransform implements ClassTransform {
                         var localTypes = new HashMap<Integer, VarInfo>();
                         var locals = new HashMap<Integer, VarInfo>();
                         int argsArr; // slot with reference to array with values
+                        int argsNames; // slot with reference to variable names
                         {
                             var mapOpt = opt.get().localVariables().stream().mapToInt(LocalVariableInfo::slot).max();
                             var maxSlotIndex = mapOpt.isPresent() ? mapOpt.getAsInt() + 1 : 1;
@@ -86,22 +86,37 @@ final class JvmInsightTransform implements ClassTransform {
                                 cb.loadConstant(slot); // index
                                 loadObjectWraper(cb, typeDescr, slot); // value
                                 cb.arrayStore(TypeKind.REFERENCE);
-
-                                for (var localVar : opt.get().localVariables()) {
-                                    if (localVar.startPc() == 0 && localVar.slot() == slot) {
-                                        final VarInfo info = new VarInfo(localVar);
-                                        localTypes.put(slot, info);
-                                        locals.put(slot, info);
-                                        break;
-                                    }
-                                }
                             }
                             argsArr = maxSlotIndex;
-                            cb.localVariable(argsArr, "$JvmInsight$args",
+                            cb.localVariable(argsArr, "$JvmInsight$locals",
                                 ClassDesc.ofDescriptor("[Ljava/lang/Object;"),
                                 firstLabel, lastLabel
                             );
                             cb.astore(argsArr);
+
+                            argsNames = maxSlotIndex + 1;
+                            // copies all the values into an argument
+                            cb.loadConstant(maxSlotIndex);
+                            cb.anewarray(ConstantDescs.CD_String);
+                            for (var localVar : opt.get().localVariables()) {
+                                var slot = localVar.slot();
+                                if (localVar.startPc() == 0) {
+                                    final VarInfo info = new VarInfo(localVar);
+                                    localTypes.put(slot, info);
+                                    locals.put(slot, info);
+
+                                    cb.dup(); // arrayref
+                                    cb.loadConstant(slot); // index
+                                    cb.loadConstant(info.name()); // value
+                                    cb.arrayStore(TypeKind.REFERENCE);
+                                }
+                            }
+                            cb.localVariable(argsNames, "$JvmInsight$names",
+                                ClassDesc.ofDescriptor("[Ljava/lang/String;"),
+                                firstLabel, lastLabel
+                            );
+                            cb.astore(argsNames);
+
                             cb.labelBinding(firstLabel);
                         }
                         var endOfStatement = new Object() {
@@ -109,7 +124,7 @@ final class JvmInsightTransform implements ClassTransform {
 
                             final void endOfLine() {
                                 if (lastLine != null) {
-                                    onHook("return", "statements", method, lastLine.line(), locals.values(), argsArr, cb);
+                                    onHook("return", "statements", method, lastLine.line(), argsNames, argsArr, cb);
                                     lastLine = null;
                                 }
                             }
@@ -152,40 +167,66 @@ final class JvmInsightTransform implements ClassTransform {
                             }
                             if (instr instanceof ReturnInstruction ret) {
                                 endOfStatement.endOfLine();
-                                onHook("return", "roots", method, -1, locals.values(), argsArr, cb);
+                                onHook("return", "roots", method, -1, argsNames, argsArr, cb);
                             }
 
                             cb.with(instr);
 
                             if (instr instanceof Label label) {
                                 if (enterLabel == null) {
-                                    onHook("enter", "roots", method, -1, locals.values(), argsArr, cb);
+                                    onHook("enter", "roots", method, -1, argsNames, argsArr, cb);
                                     enterLabel = label;
                                 }
-                                var it = locals.entrySet().iterator();
-                                while (it.hasNext()) {
-                                    var en = it.next();
-                                    if (en.getValue().endScope() == label) {
-                                        it.remove();
+                                try (
+                                    var updateNamesArr = new AutoCloseable() {
+                                        private boolean ready;
+
+                                        void putName(int index, String name) {
+                                            if (!ready) {
+                                                ready = true;
+                                                cb.aload(argsNames);
+                                            }
+                                            cb.dup(); // array for store
+                                            cb.loadConstant(index); // index
+                                            cb.loadConstant(name); // value
+                                            cb.aastore();
+                                        }
+
+                                        @Override
+                                        public void close() {
+                                            if (ready) {
+                                                cb.pop();
+                                            }
+                                        }
                                     }
-                                }
-                                for (var info : localTypes.values()) {
-                                    if (info.startScope() == label) {
-                                        locals.put(info.slot(), info);
+                                ) {
+                                    var it = locals.entrySet().iterator();
+                                    while (it.hasNext()) {
+                                        var en = it.next();
+                                        if (en.getValue().endScope() == label) {
+                                            updateNamesArr.putName(en.getValue().slot(), null);
+                                            it.remove();
+                                        }
+                                    }
+                                    for (var info : localTypes.values()) {
+                                        if (info.startScope() == label) {
+                                            locals.put(info.slot(), info);
+                                            updateNamesArr.putName(info.slot(), info.name());
+                                        }
                                     }
                                 }
                             }
                             if (instr instanceof LineNumber line) {
                                 endOfStatement.endOfLine();
                                 endOfStatement.lastLine = line;
-                                onHook("enter", "statements", method, line.line(), locals.values(), argsArr, cb);
+                                onHook("enter", "statements", method, line.line(), argsNames, argsArr, cb);
                             }
                         }
                         cb.labelBinding(lastLabel);
                         var isConstructor = method.methodName().equalsString("<init>");
                         if (!isConstructor && enterLabel != null) {
                             var onReturnExceptional = cb.newBoundLabel();
-                            onHook("return", "roots", method, -1, localTypes.values(), argsArr, cb);
+                            onHook("return", "roots", method, -1, argsNames, argsArr, cb);
                             cb.athrow();
                             cb.exceptionCatchAll(enterLabel, lastLabel, onReturnExceptional);
                         }
@@ -209,7 +250,7 @@ final class JvmInsightTransform implements ClassTransform {
         }
     }
 
-    private void onHook(String type, String fieldName, MethodModel method, int line, Collection<VarInfo> locals, int argsArr, CodeBuilder cb) {
+    private void onHook(String type, String fieldName, MethodModel method, int line, int argsNames, int argsArr, CodeBuilder cb) {
         var insightClazz = ClassDesc.of(JvmInsight.class.getName());
         var boot = ConstantDescs.ofCallsiteBootstrap(insightClazz, "metafactory", ConstantDescs.CD_CallSite, ConstantDescs.CD_String);
         var ref = DynamicCallSiteDesc.of(boot, fieldName, MethodTypeDesc.of(callbackClass), type);
@@ -224,19 +265,7 @@ final class JvmInsightTransform implements ClassTransform {
             argumentCount += 2;
             // array with names
             cb.loadConstant("names");
-
-            var maxOpt = locals.stream().mapToInt(VarInfo::slot).max();
-            var length = maxOpt.isPresent() ? maxOpt.getAsInt() + 1 : 0;
-
-            cb.loadConstant(length);
-            cb.anewarray(ConstantDescs.CD_String);
-
-            for (var l : locals) {
-                cb.dup(); // duplicate the array
-                cb.loadConstant(l.slot());
-                cb.loadConstant(l.name());
-                cb.aastore();
-            }
+            cb.aload(argsNames);
         }
 
         {
