@@ -15,6 +15,7 @@ package org.apidesign.graalvm.insight;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,10 +24,10 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.StreamSupport;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 
@@ -363,6 +364,50 @@ public final class JvmInsightEspressoTest {
         """, out.toString(), "Properly captured output while stepping thru the function");
     }
 
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void testCountDownThrow(JvmType jvm) throws Exception {
+        var insight = """
+            insight.on('return', (ctx, frame) => {
+                let sb = `${ctx.name.match(/;\\.([\\w]*)/)[1]}:`;
+                let sep = "";
+                for (let p in frame) {
+                    sb = sb + sep + p + "=" + frame[p];
+                    sep = ","
+                }
+                print(sb);
+            }, {
+                roots : true,
+                rootNameFilter : '.*countDown.*'
+            });
+            """;
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "countDown.js")
+        ) {
+            jvm.invokeFactorialMethodLong("countDown", 10);
+        } catch (IllegalArgumentException ex) {
+            assertEquals("Count down", ex.getMessage());
+        } catch (PolyglotException ex) {
+            assertEquals(IllegalArgumentException.class.getName(), ex.getGuestObject().getMetaObject().getMetaQualifiedName());
+            assertEquals("Count down", ex.getMessage());
+        }
+        assertEquals("""
+        countDown:arg_0=0
+        countDown:arg_0=1
+        countDown:arg_0=2
+        countDown:arg_0=3
+        countDown:arg_0=4
+        countDown:arg_0=5
+        countDown:arg_0=6
+        countDown:arg_0=7
+        countDown:arg_0=8
+        countDown:arg_0=9
+        countDown:arg_0=10
+        """, out.toString(), "Properly captured output while throwing an exception");
+
+    }
+
+
     public enum JvmType {
         ESPRESSO, JVM;
 
@@ -457,7 +502,7 @@ public final class JvmInsightEspressoTest {
             }
         }
 
-        final long invokeFactorialMethodLong(String name, Object... args) {
+        final long invokeFactorialMethodLong(String name, Object... args) throws Exception {
             return switch (this) {
                 case ESPRESSO -> Factorial.invokeMember(name, args).asLong();
                 case JVM -> {
@@ -470,8 +515,12 @@ public final class JvmInsightEspressoTest {
                             yield ((Number) value).longValue();
                         }
                         throw new IllegalStateException("Cannot find " + name);
-                    } catch (ReflectiveOperationException ex) {
-                        throw new IllegalStateException(ex);
+                    } catch (InvocationTargetException ex) {
+                        if (ex.getTargetException() instanceof Exception target) {
+                            throw target;
+                        } else {
+                            throw ex;
+                        }
                     }
                 }
             };

@@ -37,6 +37,16 @@ public final class Factorial {
         return sb.toString();
     }
 
+    public static void countDown(int arg_0) {
+        // name arg_0 selected because of Espresso doesn't use parameter name
+        // info when returning from a function, JVM Insight handles any name
+        if (arg_0 <= 0) {
+            throw new IllegalArgumentException("Count down");
+        } else {
+            countDown(arg_0 - 1);
+        }
+    }
+
     public static int simpleReturn(int n) {
         return n;
     }

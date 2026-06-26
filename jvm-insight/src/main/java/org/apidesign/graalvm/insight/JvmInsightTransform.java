@@ -13,8 +13,6 @@
  */
 package org.apidesign.graalvm.insight;
 
-import java.io.Flushable;
-import java.io.IOException;
 import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
@@ -40,7 +38,6 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,6 +66,7 @@ final class JvmInsightTransform implements ClassTransform {
                     mb.withCode(cb -> {
                         var firstLabel = cb.newLabel();
                         var lastLabel = cb.newLabel();
+                        Label enterLabel = null;
                         var methodType = method.methodTypeSymbol();
                         var localTypes = new HashMap<Integer, VarInfo>();
                         var locals = new HashMap<Integer, VarInfo>();
@@ -106,7 +104,6 @@ final class JvmInsightTransform implements ClassTransform {
                             cb.astore(argsArr);
                             cb.labelBinding(firstLabel);
                         }
-                        var enterGenerated = false;
                         var endOfStatement = new Object() {
                             LineNumber lastLine;
 
@@ -161,16 +158,20 @@ final class JvmInsightTransform implements ClassTransform {
                             cb.with(instr);
 
                             if (instr instanceof Label label) {
-                                if (!enterGenerated) {
+                                if (enterLabel == null) {
                                     onHook("enter", "roots", method, -1, locals.values(), argsArr, cb);
-                                    enterGenerated = true;
+                                    enterLabel = label;
                                 }
-                                var it = localTypes.entrySet().iterator();
+                                var it = locals.entrySet().iterator();
                                 while (it.hasNext()) {
                                     var en = it.next();
-                                    if (en.getValue().endLabel() == label) {
+                                    if (en.getValue().endScope() == label) {
                                         it.remove();
-                                        locals.remove(en.getKey());
+                                    }
+                                }
+                                for (var info : localTypes.values()) {
+                                    if (info.startScope() == label) {
+                                        locals.put(info.slot(), info);
                                     }
                                 }
                             }
@@ -181,6 +182,13 @@ final class JvmInsightTransform implements ClassTransform {
                             }
                         }
                         cb.labelBinding(lastLabel);
+                        var isConstructor = method.methodName().equalsString("<init>");
+                        if (!isConstructor && enterLabel != null) {
+                            var onReturnExceptional = cb.newBoundLabel();
+                            onHook("return", "roots", method, -1, localTypes.values(), argsArr, cb);
+                            cb.athrow();
+                            cb.exceptionCatchAll(enterLabel, lastLabel, onReturnExceptional);
+                        }
                     });
                 } else {
                     mb.with(me);
@@ -191,10 +199,11 @@ final class JvmInsightTransform implements ClassTransform {
         }
     }
 
-    private record VarInfo(String name, int slot, ClassDesc typeSymbol, Label endLabel) {
+    private record VarInfo(String name, int slot, ClassDesc typeSymbol, Label startScope, Label endScope) {
         VarInfo(LocalVariableInfo localVar) {
             this(
                 localVar.name().stringValue(), localVar.slot(), localVar.typeSymbol(),
+                localVar instanceof LocalVariable var ? var.startScope() : null,
                 localVar instanceof LocalVariable var ? var.endScope() : null
             );
         }
