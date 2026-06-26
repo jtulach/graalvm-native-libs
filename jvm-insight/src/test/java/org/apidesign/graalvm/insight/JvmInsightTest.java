@@ -23,6 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Simple bytecode patching tests. Sometimes it is not easy to debug
+ * {@link JvmInsightEspressoTest} as the bytecode being processed there
+ * is <em>too complicated<em>. In such case it is recommended to create
+ * a {@code simpleXyz} test in {@link Factorial} class demonstrating the
+ * problem and test it from this class. E.g. without involving Espresso
+ * at all.
+ */
 public class JvmInsightTest {
     /** This is the {@link Factorial} class loaded by different classloader.
      * That classloader patches the bytecode of the loaded classes to be
