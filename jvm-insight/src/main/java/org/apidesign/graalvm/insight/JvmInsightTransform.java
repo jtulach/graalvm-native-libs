@@ -13,6 +13,8 @@
  */
 package org.apidesign.graalvm.insight;
 
+import java.io.Flushable;
+import java.io.IOException;
 import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
@@ -105,7 +107,17 @@ final class JvmInsightTransform implements ClassTransform {
                             cb.labelBinding(firstLabel);
                         }
                         var enterGenerated = false;
+                        var endOfStatement = new Object() {
+                            LineNumber lastLine;
 
+                            final void endOfLine() {
+                                if (lastLine != null) {
+                                    onHook("return", "STATEMENTS", method, lastLine.line(), locals.values(), argsArr, cb);
+                                    lastLine = null;
+                                }
+                            }
+                        };
+                        // System.err.println("method: " + method.methodName().stringValue());
                         for (var instr : code.elementList()) {
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {
@@ -142,6 +154,7 @@ final class JvmInsightTransform implements ClassTransform {
                                 continue;
                             }
                             if (instr instanceof ReturnInstruction ret) {
+                                endOfStatement.endOfLine();
                                 onHook("return", "ROOTS", method, -1, locals.values(), argsArr, cb);
                             }
 
@@ -162,6 +175,8 @@ final class JvmInsightTransform implements ClassTransform {
                                 }
                             }
                             if (instr instanceof LineNumber line) {
+                                endOfStatement.endOfLine();
+                                endOfStatement.lastLine = line;
                                 onHook("enter", "STATEMENTS", method, line.line(), locals.values(), argsArr, cb);
                             }
                         }

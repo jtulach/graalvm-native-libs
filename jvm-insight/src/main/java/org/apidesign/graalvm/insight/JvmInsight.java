@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 
 public final class JvmInsight  {
     private static final Map<Builder.When, BiConsumer<String, Map<String, Object>>> ROOTS = new EnumMap<>(Builder.When.class);
-    private static BiConsumer<String, Map<String, Object>> STATEMENTS;
+    private static final Map<Builder.When, BiConsumer<String, Map<String, Object>>> STATEMENTS = new EnumMap<>(Builder.When.class);
 
     private JvmInsight() {
     }
@@ -45,7 +45,7 @@ public final class JvmInsight  {
         block.accept(new JvmInsight());
         return () -> {
             ROOTS.clear();
-            STATEMENTS = null;
+            STATEMENTS.clear();
         };
     }
 
@@ -137,7 +137,7 @@ public final class JvmInsight  {
                 ROOTS.put(when, new Convertor());
             }
             if (statements) {
-                STATEMENTS = new Convertor();
+                STATEMENTS.put(when, new Convertor());
             }
         }
     }
@@ -161,17 +161,15 @@ public final class JvmInsight  {
     ) {
         try {
             var myLkp = MethodHandles.lookup();
-            var handle = switch (name) {
-                case "ROOTS" -> {
-                    var roots = myLkp.findStatic(JvmInsight.class, "roots", MethodType.methodType(BiConsumer.class, Builder.When.class));
-                    yield switch (when) {
-                        case "enter" -> roots.bindTo(Builder.When.ENTER);
-                        case "return" -> roots.bindTo(Builder.When.RETURN);
-                        default -> throw new IllegalArgumentException(when);
-                    };
-                }
-                case "STATEMENTS" -> myLkp.findStatic(JvmInsight.class, "statements", MethodType.methodType(BiConsumer.class));
+            var rawHandle = switch (name) {
+                case "ROOTS" -> myLkp.findStatic(JvmInsight.class, "roots", MethodType.methodType(BiConsumer.class, Builder.When.class));
+                case "STATEMENTS" -> myLkp.findStatic(JvmInsight.class, "statements", MethodType.methodType(BiConsumer.class, Builder.When.class));
                 default -> throw new NoSuchFieldException(name);
+            };
+            var handle = switch (when) {
+                case "enter" -> rawHandle.bindTo(Builder.When.ENTER);
+                case "return" -> rawHandle.bindTo(Builder.When.RETURN);
+                default -> throw new IllegalArgumentException(when);
             };
             return new ConstantCallSite(handle);
         } catch (NoSuchMethodException | NoSuchFieldException | IllegalAccessException ex) {
@@ -183,7 +181,7 @@ public final class JvmInsight  {
         return ROOTS.get(when);
     }
 
-    private static BiConsumer<String, Map<String, Object>> statements() {
-        return STATEMENTS;
+    private static BiConsumer<String, Map<String, Object>> statements(Builder.When when) {
+        return STATEMENTS.get(when);
     }
 }

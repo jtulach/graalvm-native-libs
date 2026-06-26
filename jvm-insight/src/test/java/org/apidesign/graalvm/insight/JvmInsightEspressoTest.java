@@ -341,7 +341,7 @@ public final class JvmInsightEspressoTest {
             });
 
             insight.on('return', (ctx, frame) => {
-                printDump("Step over: ", frame);
+                printDump(`Step over finished at ${ctx.line}: `, frame);
             }, {
                 statements : true,
                 rootNameFilter : '.*simpleConcat.*'
@@ -355,10 +355,10 @@ public final class JvmInsightEspressoTest {
         }
         assertEquals("""
         Method entered Lorg/apidesign/graalvm/insight/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;a:Hi,b:There!
-        Step over: a:Hi,b:There!
-        Step over: a:Hi,b:There!,sb:Hi
-        Step over: a:Hi,b:There!,sb:HiThere!
-        Step over: a:Hi,b:There!,sb:HiThere!
+        Step over finished at 34: a:Hi,b:There!,sb:
+        Step over finished at 35: a:Hi,b:There!,sb:Hi
+        Step over finished at 36: a:Hi,b:There!,sb:HiThere!
+        Step over finished at 37: a:Hi,b:There!,sb:HiThere!
         Method exited Lorg/apidesign/graalvm/insight/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
         """, out.toString(), "Properly captured output while stepping thru the function");
     }

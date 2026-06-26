@@ -30,6 +30,13 @@ public final class Factorial {
         }
     }
 
+    public static String simpleConcat(String a, String b) {
+        var sb = new StringBuilder(); sb.append(""); /* empty append needed for Espresso */
+        sb.append(a);
+        sb.append(b);
+        return sb.toString();
+    }
+
     public static int simpleReturn(int n) {
         return n;
     }
@@ -54,13 +61,6 @@ public final class Factorial {
             n--;
         }
         return sum;
-    }
-
-    public static String simpleConcat(String a, String b) {
-        var sb = new StringBuilder();
-        sb.append(a);
-        sb.append(b);
-        return sb.toString();
     }
 
     public static int allTypes(
