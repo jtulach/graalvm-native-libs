@@ -55,6 +55,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
      */
     private static final String OPT_HANDLER = "handler";
 
+    private final JvmInsight global;
     private final ClassFile clazzFile;
     private final Pattern pattern;
     private final Pattern methods;
@@ -69,6 +70,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
     }
 
     private static void registerAgent(String args, Instrumentation instr) throws Exception {
+        var insight = JvmInsight.enableInstrumentation(instr);
         Pattern classes = null;
         Pattern methods = null;
         BiConsumer<String, Map<String, Object>> handler = null;
@@ -98,10 +100,11 @@ final class JvmInsightAgent implements ClassFileTransformer {
             }
         }
 
-        instr.addTransformer(new JvmInsightAgent(classes, methods, handler));
+        instr.addTransformer(new JvmInsightAgent(insight, classes, methods, handler));
     }
 
     private JvmInsightAgent(
+        JvmInsight insight,
         Pattern pattern, Pattern methods,
         BiConsumer<String, Map<String, Object>> handler
     ) {
@@ -111,6 +114,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
         if (handler == null) {
             throw new IllegalArgumentException("Specify handler=my.pkg.MyHandler");
         }
+        this.global = insight;
         this.clazzFile = ClassFile.of();
         this.pattern = pattern;
         this.methods = methods;
@@ -126,15 +130,9 @@ final class JvmInsightAgent implements ClassFileTransformer {
         if (pattern.matcher(className).matches()) {
             try {
                 log("Transforming " + className);
-                var handle = JvmInsight.apply((insight) -> {
-                    insight.on(null).roots().call((methodName, localVars) -> {
-                        if (methods == null || methods.matcher(methodName).matches()) {
-                            handler.accept(methodName, localVars);
-                        }
-                    });
-                });
                 var model = clazzFile.parse(classfileBuffer);
                 var newByteCode = clazzFile.transformClass(model, new JvmInsightTransform(model));
+                configure(className);
                 return newByteCode;
             } catch (Throwable t) {
                 t.printStackTrace();
@@ -145,5 +143,16 @@ final class JvmInsightAgent implements ClassFileTransformer {
 
     private static void log(String msg) {
         System.err.println("[JvmInsightAgent]: " + msg);
+    }
+
+
+    private void configure(String className) {
+        var handle = global.configure((insight) -> {
+                insight.apply(null).roots().call((methodName, localVars) -> {
+                    if (methods == null || methods.matcher(methodName).matches()) {
+                        handler.accept(methodName, localVars);
+                    }
+                });
+        });
     }
 }

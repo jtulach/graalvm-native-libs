@@ -46,7 +46,7 @@ public class JvmInsightTest {
             JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
             cp
         };
-        var loader = new JvmInsightLoader(new AvoidClassLoader(Factorial.class), bothCp);
+        var loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");
@@ -66,8 +66,9 @@ public class JvmInsightTest {
             sum[0] += n.intValue();
         };
 
-        JvmInsight.apply((insight) -> {
-            insight.on(FactorialHosted)
+        var jvmInsight = JvmInsight.find(FactorialHosted.getClassLoader());
+        jvmInsight.configure((insight) -> {
+            insight.apply(FactorialHosted)
                 .roots()
                 .call(counter);
         });

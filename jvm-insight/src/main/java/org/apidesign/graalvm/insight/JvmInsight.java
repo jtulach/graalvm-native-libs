@@ -18,40 +18,75 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
-import java.util.EnumMap;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
+/** {@link JvmInsight} allows advanced instrumentation to be applied to
+ * classes running inside of the JVM.
+ * <ul>
+ *   <li>Use {@link JvmInsight#find} method to obtain instance of the JVM Insight</li>
+ *   <li>Then use its {@link JvmInsight#configure} method to setup up an
+ *      Insight hook</li>
+ * </ul>
+ *
+ */
 public final class JvmInsight  {
-    private static final Map<Builder.When, BiConsumer<String, Map<String, Object>>> ROOTS = new EnumMap<>(Builder.When.class);
-    private static final Map<Builder.When, BiConsumer<String, Map<String, Object>>> STATEMENTS = new EnumMap<>(Builder.When.class);
+    private static final JvmInsight DEFAULT = new JvmInsight();
+    private Object instr;
 
     private JvmInsight() {
+    }
+
+    static JvmInsight enableInstrumentation(Object instr) {
+        DEFAULT.instr = instr;
+        return DEFAULT;
+    }
+
+    /**
+     * Finds a JVM Insight hook for given loader.
+     * @param loader the classloader to find associated insight for
+     * @return an instance of JVM Insight associated with the loader
+     *    or a dummy instance, if the loader supports no JVM Insight
+     */
+    public static JvmInsight find(ClassLoader loader) {
+        return switch (loader) {
+            case JvmInsightLoader insightLoader -> insightLoader.getJvmInsight();
+            case null, default -> DEFAULT;
+        };
     }
 
     /**
      * Applies new Insights to the running JVM.
      *
-     * @param block block that receives an instance of {@link JvmInsight}
-     *   and can use it to configure its JVM Insights
+     * @param block block that receives an instance of {@link JvmInsight.Builder}
+     *   factory and can use it to configure its JVM Insights
      * @return a handle that can be {@link AutoCloseable#close()} when
      *   these insights are to be disabled
      */
-    public static AutoCloseable apply(Consumer<JvmInsight> block) {
-        block.accept(new JvmInsight());
-        return () -> {
-            ROOTS.clear();
-            STATEMENTS.clear();
-        };
+    public AutoCloseable configure(Consumer<Function<Class<?>, Builder>> block) {
+        if (this == DEFAULT && this.instr == null) {
+            // no op
+            return () -> {};
+        }
+
+        var registrar = new Registry();
+
+        block.accept((clazz) -> {
+            return new Builder(registrar, clazz);
+        });
+        return registrar;
     }
 
     /**
      * Creates a {@link JvmInsight}-ready classloader. Classes loaded by
-     * this {@link ClassLoader} are patched to be ready for {@link #apply}-ing
+     * this {@link ClassLoader} are patched to be ready for {@link #configure}-ing
      * JVM Insights.
      *
      * @param parent the parent classloader to use or {@code null}
@@ -59,32 +94,26 @@ public final class JvmInsight  {
      * @return the JVM Insights ready classloader
      */
     public static ClassLoader createLoader(ClassLoader parent, URL... cp) {
-        return new JvmInsightLoader(parent, cp);
-    }
-
-    /** Registers an Insight handler on given type. This method selects
-     * a class to operate on and returns a builder to configure the <em>Insight</em>.
-     *
-     * @param clazz the clazz to operate on
-     * @return builder to configure and finish with {@link Builder#call} to register
-     *    the callback
-     */
-    public Builder on(Class<?> clazz) {
-        return new Builder(clazz);
+        var insight = new JvmInsight();
+        var loader = new JvmInsightLoader(insight, parent, cp);
+        insight.instr = loader;
+        return loader;
     }
 
     /** Configuration for an Insight callback.
      * Use methods of this class to configure a callback and then register
      * it by calling {@link Builder#call}.
      */
-    public static final class Builder {
+    public final class Builder {
+        private final Registry registry;
         private final Class<?> clazz;
         private boolean statements;
         private boolean roots;
         private Pattern methodFilter;
         private When when = When.ENTER;
 
-        private Builder(Class<?> clazz) {
+        private Builder(Registry registry, Class<?> clazz) {
+            this.registry = registry;
             this.clazz = clazz;
         }
 
@@ -114,31 +143,7 @@ public final class JvmInsight  {
         }
 
         public void call(BiConsumer<String, Map<String, Object>> handler) {
-            class Convertor implements BiConsumer<String, Map<String, Object>> {
-                @Override
-                public void accept(String t, Map<String, Object> data) {
-                    var names = (String[])data.get("names");
-                    var values = (Object[])data.get("values");
-                    var frame = new HashMap<String, Object>();
-                    for (var i = 0; i < names.length; i++) {
-                        if (names[i] != null) {
-                            frame.put(names[i], values[i]);
-                        }
-                    }
-                    handler.accept(t, frame);
-                    for (var i = 0; i < names.length; i++) {
-                        if (names[i] != null) {
-                            values[i] = frame.get(names[i]);
-                        }
-                    }
-                }
-            }
-            if (roots) {
-                ROOTS.put(when, new Convertor());
-            }
-            if (statements) {
-                STATEMENTS.put(when, new Convertor());
-            }
+            registry.register(this, handler);
         }
     }
 
@@ -172,6 +177,7 @@ public final class JvmInsight  {
                 MethodType.methodType(
                     Consumer.class,
                     Builder.When.class,
+                    Class.class,
                     String.class
                 )
             );
@@ -185,20 +191,47 @@ public final class JvmInsight  {
                 + ";." + methodName
                 + methodDescriptor;
 
-            var consumer = handle.bindTo(fqn);
+            var consumer = handle.bindTo(clazz).bindTo(fqn);
             return new ConstantCallSite(consumer);
         } catch (NoSuchMethodException | IllegalAccessException ex) {
             throw new IllegalArgumentException(ex);
         }
     }
 
-    private static Consumer<Map<String, Object>> roots(Builder.When when, String fqn) {
-        var bic = ROOTS.get(when);
-        return bic == null ? null : (value) -> bic.accept(fqn, value);
+    private static Consumer<Map<String, Object>> roots(Builder.When when, Class<?> clazz, String fqn) {
+        return JvmInsightClassData.find(clazz).roots(when, fqn);
     }
 
-    private static Consumer<Map<String, Object>> statements(Builder.When when, String fqn) {
-        var bic = STATEMENTS.get(when);
-        return bic == null ? null : (value) -> bic.accept(fqn, value);
+    private static Consumer<Map<String, Object>> statements(Builder.When when, Class<?> clazz, String fqn) {
+        return JvmInsightClassData.find(clazz).statements(when, fqn);
+    }
+
+    private static class Registry implements AutoCloseable {
+        private final Map<Class<?>, List<JvmInsightClassData.Convertor>> entries = new LinkedHashMap<>();
+
+        Registry() {
+        }
+
+        @Override
+        public synchronized void close() throws Exception {
+            for (var entry : entries.entrySet()) {
+                var data = JvmInsightClassData.find(entry.getKey());
+                for (var reg : entry.getValue()) {
+                    data.unregister(reg);
+                }
+            }
+            entries.clear();
+        }
+
+        private synchronized void register(Builder bldr, BiConsumer<String, Map<String, Object>> handler) {
+            var data = JvmInsightClassData.find(bldr.clazz);
+            var reg = data.register(bldr.roots, bldr.statements, bldr.when, bldr.methodFilter, handler);
+            var list = entries.get(bldr.clazz);
+            if (list == null) {
+                list = new ArrayList<>();
+                entries.put(bldr.clazz, list);
+            }
+            list.add(reg);
+        }
     }
 }

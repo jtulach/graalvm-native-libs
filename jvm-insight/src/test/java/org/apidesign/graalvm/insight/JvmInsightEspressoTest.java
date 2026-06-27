@@ -89,7 +89,7 @@ public final class JvmInsightEspressoTest {
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
 
-        var loader = new JvmInsightLoader(new AvoidClassLoader(Factorial.class), bothCp);
+        var loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");
@@ -453,8 +453,9 @@ public final class JvmInsightEspressoTest {
                         fn.apply(ctx, needsTxtFrame ? txtFrame : frame);
                     }
                 };
-                handle = JvmInsight.apply((insight) -> {
-                    var bldr = insight.on(FactorialHosted);
+                var jvmInsight = JvmInsight.find(FactorialHosted.getClassLoader());
+                handle = jvmInsight.configure((insight) -> {
+                    var bldr = insight.apply(FactorialHosted);
                     switch (type) {
                         case "enter" -> bldr.when(JvmInsight.Builder.When.ENTER);
                         case "return" -> bldr.when(JvmInsight.Builder.When.RETURN);

@@ -53,12 +53,15 @@ public final class NativeLauncher {
     public static void main(String... args) throws Exception {
         var cp = new File(args[0]).toURI().toURL();
         var loader = JvmInsight.createLoader(JvmInsight.class.getClassLoader(), cp);
+        var jvmInsight = JvmInsight.find(loader);
+
         var clazz = loader.loadClass(args[1]);
         var method = clazz.getMethod("main", String[].class);
         method.setAccessible(true);
+
         var remaining = Arrays.copyOfRange(args, 2, args.length);
-        try (var handle = JvmInsight.apply((insight) -> {
-            insight.on(clazz).roots().call((name, localVars) -> {
+        try (var handle = jvmInsight.configure((insight) -> {
+            insight.apply(clazz).roots().call((name, localVars) -> {
                 if (localVars.containsKey("n")) {
                     System.err.println("[Crema+JvmInsight]: method " + name + " with: " + localVars);
                 }

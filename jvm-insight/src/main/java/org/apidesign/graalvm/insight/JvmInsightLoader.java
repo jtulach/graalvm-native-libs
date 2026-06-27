@@ -23,10 +23,12 @@ import java.net.URLClassLoader;
  * patch bytecode to be {@link JvmInsight}-ready.
  */
 final class JvmInsightLoader extends URLClassLoader {
+    private final JvmInsight jvmInsight;
     private final ClassFile clazzFile;
 
-    JvmInsightLoader(ClassLoader l, URL... u) {
+    JvmInsightLoader(JvmInsight jvmInsight, ClassLoader l, URL... u) {
         super(u, l);
+        this.jvmInsight = jvmInsight;
         this.clazzFile = ClassFile.of();
     }
 
@@ -59,4 +61,7 @@ final class JvmInsightLoader extends URLClassLoader {
         return clazzFile.transformClass(model, new JvmInsightTransform(model));
     }
 
+    final JvmInsight getJvmInsight() {
+        return jvmInsight;
+    }
 }
