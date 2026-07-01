@@ -29,6 +29,7 @@
     
     <modules>
         <module>jvm-channel</module>
+        <module>jvm-interop</module>
         <module>examples/jvmlauncher</module>
         <module>examples/jvmchannel</module>
     </modules>
