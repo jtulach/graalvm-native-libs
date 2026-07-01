@@ -13,8 +13,6 @@
  */
 package org.apidesign.jvm.channel;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
