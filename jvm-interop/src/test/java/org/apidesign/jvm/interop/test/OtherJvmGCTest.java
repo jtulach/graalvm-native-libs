@@ -11,13 +11,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.jvm.interop.impl;
+package org.apidesign.jvm.interop.test;
 
+import org.apidesign.jvm.interop.impl.ContextUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +42,7 @@ public class OtherJvmGCTest {
 
     @BeforeAll
     public static void initializeChannel() {
-        System.setProperty(OtherJvmPool.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
+        System.setProperty(ContextUtils.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
         CHANNEL = Channel.create(null, OtherJvmPool.class);
         CHANNEL
                 .getConfig()
@@ -188,9 +188,7 @@ public class OtherJvmGCTest {
     private static Value loadOtherJvmClass(String name) throws Exception {
         var msg = new OtherJvmMessage.LoadClass(name);
         var raw = CHANNEL.execute(OtherJvmResult.class, msg).value(null);
-        if (raw instanceof OtherJvmObject other) {
-            assertTrue(other.assertChannel(CHANNEL));
-        }
+        ctx.assertChannel(raw, CHANNEL);
         var value = ctx.asValue(raw);
         return value;
     }

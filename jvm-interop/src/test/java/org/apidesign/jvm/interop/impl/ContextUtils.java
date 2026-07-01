@@ -17,28 +17,34 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
+import org.apidesign.jvm.channel.Channel;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Testing {@link Context} utilities.
  */
-final class ContextUtils {
+public final class ContextUtils {
     private Context ctx;
 
-    static ContextUtils newBuilder(String... langs) {
+    public static final String DUMP_MESSAGE_PROPERTY = OtherJvmPool.DUMP_MESSAGE_PROPERTY;
+
+    public static ContextUtils newBuilder(String... langs) {
         return new ContextUtils();
     }
 
-    ContextUtils build() {
-        this.ctx = Context.newBuilder().build();
+    public ContextUtils build() {
+        var host = HostAccess.ALL;
+        this.ctx = Context.newBuilder().allowHostAccess(host).build();
         return this;
     }
 
-    Value asValue(Object obj) {
+    public Value asValue(Object obj) {
         return ctx.asValue(obj);
     }
 
-    Object unwrapValue(Value value) {
+    public Object unwrapValue(Value value) {
         var unwrapper = new Unwrapper();
         var unwrapperValue = asValue(unwrapper);
         unwrapperValue.execute(value);
@@ -46,8 +52,22 @@ final class ContextUtils {
         return unwrapper.args[0];
     }
 
-    Context context() {
+    public Context context() {
         return ctx;
+    }
+
+    public void assertChannel(TruffleObject raw, Channel<OtherJvmPool> ch) {
+        if (raw instanceof OtherJvmObject other) {
+            assertTrue(other.assertChannel(ch));
+        }
+    }
+
+    public boolean isOtherJvmObject(Object unwrap) {
+        return unwrap instanceof OtherJvmObject;
+    }
+
+    public System.LoggerFinder newOtherJvmLogger(Channel<OtherJvmPool> ch) {
+        return new OtherJvmLogger(ch);
     }
 
     @ExportLibrary(InteropLibrary.class)

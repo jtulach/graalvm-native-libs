@@ -26,18 +26,12 @@ import org.junit.jupiter.api.Test;
 
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.interop.InteropLibrary;
-import com.oracle.truffle.api.interop.TruffleObject;
-import com.oracle.truffle.api.library.ExportLibrary;
-import com.oracle.truffle.api.library.ExportMessage;
 import java.lang.foreign.MemorySegment;
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Consumer;
 import org.apidesign.jvm.channel.Channel;
-import org.apidesign.jvm.interop.impl.OtherJvmPool;
+import org.apidesign.jvm.interop.test.OtherClass;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -54,7 +48,7 @@ public class OtherJvmObjectTest {
 
     @BeforeAll
     public static void initializeChannel() {
-        System.setProperty(OtherJvmPool.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
+        System.setProperty(ContextUtils.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
         CHANNEL = Channel.create(null, OtherJvmPool.class);
         CHANNEL
                 .getConfig()
@@ -73,9 +67,9 @@ public class OtherJvmObjectTest {
 
     @Test
     public void wrapBigDecimal() throws Exception {
-        var testClassValue = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var testClassValue = loadOtherJvmClass(OtherClass.class.getName());
         assertOtherJvmObject("Represents clazz from the other JVM", testClassValue);
-        var bigReal = newBigDecimal("432.322");
+        var bigReal = OtherClass.newBigDecimal("432.322");
         var otherValue = testClassValue.invokeMember("newBigDecimal", "432.322");
         assertOtherJvmObject("Represents object from the other JVM", otherValue);
 
@@ -92,25 +86,9 @@ public class OtherJvmObjectTest {
         assertTrue(ctx.unwrapValue(minusValue) instanceof OtherJvmObject, "OtherJvmObject for minus");
     }
 
-    public static BigDecimal newBigDecimal(String txt) {
-        return new BigDecimal(txt);
-    }
-
-    public static Object[] otherJvmArrayWithPrimitives() {
-        var bigReal
-                = new Object[]{
-                    "Ahoj", 't', (byte) 1, (short) 2, (int) 3, (long) 4, (float) 5, (double) 6, true
-                };
-        return bigReal;
-    }
-
-    public static Object wrap(String txt) {
-        return new MockString(txt);
-    }
-
     @Test
     public void wrapArray() throws Exception {
-        var testClassValue = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var testClassValue = loadOtherJvmClass(OtherClass.class.getName());
         var otherValue = testClassValue.invokeMember("otherJvmArrayWithPrimitives");
 
         assertTrue(otherValue.hasArrayElements(), "Array is array");
@@ -135,13 +113,9 @@ public class OtherJvmObjectTest {
 
     @Test
     public void loadTestClassViaMessage() throws Exception {
-        var testClassValue = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var testClassValue = loadOtherJvmClass(OtherClass.class.getName());
         var parsedValue = testClassValue.invokeMember("otherJvmValueOf", "32531");
         assertEquals(32531, parsedValue.asInt());
-    }
-
-    public static short otherJvmValueOf(String txt) {
-        return Short.parseShort(txt);
     }
 
     @Test
@@ -237,7 +211,7 @@ public class OtherJvmObjectTest {
 
     @Test
     public void messageFromAnUnsupportedLibrary() throws Exception {
-        var testClassValue = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var testClassValue = loadOtherJvmClass(OtherClass.class.getName());
         var bigReal = testClassValue.invokeMember("newBigDecimal", "432.322");
         var other = ctx.unwrapValue(bigReal);
         assertEquals(OtherJvmObject.class, other.getClass(), "The right class");
@@ -245,7 +219,7 @@ public class OtherJvmObjectTest {
 
     @Test
     public void nullIsSame() throws Exception {
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("nullInstance");
         var other2 = otherClass.invokeMember("nullInstance");
         assertEquals(other1, other2);
@@ -266,51 +240,19 @@ public class OtherJvmObjectTest {
                         });
     }
 
-    public static Object nullInstance() {
-        return null;
-    }
-
     private static void assertContains(String message, String subtring) {
         var at = message.indexOf(subtring);
         assertNotEquals(-1, at);
     }
 
-    private static final class MockObject {
-    }
-
-    private static final Object IDENTICAL = new MockObject();
-
-    public static Object otherJvmInstances(int kind) {
-        return switch (kind) {
-            case 0 ->
-                IDENTICAL;
-            case 1 ->
-                new MockObject();
-            case 2 ->
-                Duration.ofSeconds(42);
-            case 3 ->
-                new int[20];
-            case 4 ->
-                "Hello";
-            case 5 ->
-                "Hello".repeat(100000);
-            case 6 ->
-                wrap("Hello");
-            case 7 ->
-                wrap("Hello".repeat(100000));
-            default ->
-                null;
-        };
-    }
-
     @Test
     public void isIdenticalCheck() throws Exception {
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = localClass.invokeMember("otherJvmInstances", 0);
         var local2 = localClass.invokeMember("otherJvmInstances", 0);
         assertEquals(local1, local2);
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("otherJvmInstances", 0);
         var other2 = otherClass.invokeMember("otherJvmInstances", 0);
         assertEquals(other1, other2);
@@ -318,12 +260,12 @@ public class OtherJvmObjectTest {
 
     @Test
     public void isNotIdenticalCheck() throws Exception {
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = localClass.invokeMember("otherJvmInstances", 1);
         var local2 = localClass.invokeMember("otherJvmInstances", 1);
         assertNotEquals(local1, local2);
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("otherJvmInstances", 1);
         var other2 = otherClass.invokeMember("otherJvmInstances", 1);
         assertNotEquals(other1, other2);
@@ -333,12 +275,12 @@ public class OtherJvmObjectTest {
     public void languageCheck() throws Exception {
         var iop = InteropLibrary.getUncached();
 
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = ctx.unwrapValue(localClass.invokeMember("otherJvmInstances", 1));
         assertTrue(iop.hasLanguage(local1), "it has language");
         assertEquals("HostLanguage", iop.getLanguage(local1).getSimpleName());
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = ctx.unwrapValue(otherClass.invokeMember("otherJvmInstances", 1));
         assertTrue(iop.hasLanguage(other1), "it has language");
         assertEquals("FakeLanguage", iop.getLanguage(other1).getSimpleName());
@@ -346,12 +288,12 @@ public class OtherJvmObjectTest {
 
     @Test
     public void isDuration() throws Exception {
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = localClass.invokeMember("otherJvmInstances", 2);
         assertTrue(local1.isDuration(), "Recognized as duration");
         var ld = local1.asDuration();
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("otherJvmInstances", 2);
         assertTrue(other1.isDuration(), "Recognized as duration");
         var od = other1.asDuration();
@@ -380,12 +322,12 @@ public class OtherJvmObjectTest {
     }
 
     private void checkString(int kind) throws Exception {
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = localClass.invokeMember("otherJvmInstances", kind);
         assertTrue(local1.isString(), "Recognized as string");
         var ld = local1.asString();
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("otherJvmInstances", kind);
         assertTrue(other1.isString(), "Recognized as string");
         var od = other1.asString();
@@ -397,12 +339,12 @@ public class OtherJvmObjectTest {
     public void checkStringLikeIdentity() throws Exception {
         var hello = "Hello World!";
 
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = localClass.invokeMember("wrap", hello);
         assertTrue(local1.isString(), "Recognized as string");
         var ld = local1.asString();
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("wrap", hello);
         assertTrue(other1.isString(), "Recognized as string");
         var od = other1.asString();
@@ -419,7 +361,7 @@ public class OtherJvmObjectTest {
 
     @Test
     public void arrayIndexOutOfBounds() throws Exception {
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = localClass.invokeMember("otherJvmInstances", 3);
         assertTrue(local1.hasArrayElements(), "Recognized as duration");
         assertEquals(20, local1.getArraySize());
@@ -430,7 +372,7 @@ public class OtherJvmObjectTest {
             assertContains(ex.getMessage(), "Invalid array index 200 for array");
         }
 
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("otherJvmInstances", 3);
         assertTrue(other1.hasArrayElements(), "Recognized as duration");
         assertEquals(20, other1.getArraySize());
@@ -440,10 +382,6 @@ public class OtherJvmObjectTest {
         } catch (ArrayIndexOutOfBoundsException ex) {
             assertContains(ex.getMessage(), "Invalid array index 200 for array");
         }
-    }
-
-    public static void callback(Consumer<Object> cb, Object value) {
-        cb.accept(value);
     }
 
     @Test
@@ -471,8 +409,8 @@ public class OtherJvmObjectTest {
         var mock = new MockProxy();
         var mockValue = ctx.asValue(mock);
 
-        var localClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var localClass = ctx.asValue(OtherClass.class).getMember("static");
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
 
         localClass.invokeMember("callback", mockValue, "Real");
         mock.assertArgs("Called with Real", ctx.asValue("Real"));
@@ -483,7 +421,7 @@ public class OtherJvmObjectTest {
 
     @Test
     public void metaObjectEgClassesAreImmutableInJVM() throws Exception {
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = otherClass.invokeMember("otherJvmInstances", 0);
         var clazz1 = other1.getMetaObject();
         assertTrue(clazz1.hasMetaParents(), "Has parents");
@@ -504,43 +442,15 @@ public class OtherJvmObjectTest {
                         });
     }
 
-    public static final class WithABuffer {
-
-        public final ByteBuffer buf;
-
-        WithABuffer(ByteBuffer buf) {
-            this.buf = buf;
-        }
-
-        public String toText() {
-            var arr = new byte[buf.limit()];
-            buf.get(arr);
-            return new String(arr);
-        }
-    }
-
-    public static WithABuffer withBuffer(int type, int size) {
-        var buf
-                = switch (type) {
-            case 0 ->
-                ByteBuffer.allocateDirect(size);
-            default ->
-                throw new IllegalArgumentException();
-        };
-        buf.put("Hello".getBytes());
-        buf.flip();
-        return new WithABuffer(buf);
-    }
-
     @Test
     public void directByteBufferHostInterop() throws Exception {
-        var otherClass = ctx.asValue(OtherJvmObjectTest.class).getMember("static");
+        var otherClass = ctx.asValue(OtherClass.class).getMember("static");
         checkDirectByteBuffer(otherClass);
     }
 
     @Test
     public void directByteBufferGuestInterop() throws Exception {
-        var otherClass = loadOtherJvmClass(OtherJvmObjectTest.class.getName());
+        var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         checkDirectByteBuffer(otherClass);
     }
 
@@ -604,26 +514,6 @@ public class OtherJvmObjectTest {
             return;
         }
         fail(msg + " but got: " + unwrap);
-    }
-
-    @ExportLibrary(InteropLibrary.class)
-    static class MockString implements TruffleObject {
-
-        private final String txt;
-
-        private MockString(String txt) {
-            this.txt = txt;
-        }
-
-        @ExportMessage
-        boolean isString() {
-            return true;
-        }
-
-        @ExportMessage
-        String asString() {
-            return txt;
-        }
     }
 
     private abstract static class FakeLanguage extends TruffleLanguage<Object> {

@@ -11,12 +11,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.jvm.interop.impl;
+package org.apidesign.jvm.interop.test;
 
+import org.apidesign.jvm.interop.impl.ContextUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.BeforeAll;
@@ -24,7 +22,9 @@ import org.junit.jupiter.api.Test;
 
 import com.oracle.truffle.api.TruffleLanguage;
 import org.apidesign.jvm.channel.Channel;
+import org.apidesign.jvm.interop.impl.OtherJvmMessage;
 import org.apidesign.jvm.interop.impl.OtherJvmPool;
+import org.apidesign.jvm.interop.impl.OtherJvmResult;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -36,7 +36,7 @@ public class OtherJvmJavaScriptTest {
 
     @BeforeAll
     public static void initializeChannel() {
-        System.setProperty(OtherJvmPool.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
+        System.setProperty(ContextUtils.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
         CHANNEL = Channel.create(null, OtherJvmPool.class);
         CHANNEL
                 .getConfig()
@@ -98,16 +98,14 @@ public class OtherJvmJavaScriptTest {
     private static Value loadOtherJvmClass(String name) throws Exception {
         var msg = new OtherJvmMessage.LoadClass(name);
         var raw = CHANNEL.execute(OtherJvmResult.class, msg).value(null);
-        if (raw instanceof OtherJvmObject other) {
-            assertTrue(other.assertChannel(CHANNEL));
-        }
+        ctx.assertChannel(raw, CHANNEL);
         var value = ctx.asValue(raw);
         return value;
     }
 
     private static void assertOtherJvmObject(String msg, Value value) {
         var unwrap = ctx.unwrapValue(value);
-        if (unwrap instanceof OtherJvmObject) {
+        if (ctx.isOtherJvmObject(unwrap)) {
             return;
         }
         fail(msg + " but got: " + unwrap);

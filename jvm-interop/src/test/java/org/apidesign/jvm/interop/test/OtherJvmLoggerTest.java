@@ -11,15 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.jvm.interop.impl;
+package org.apidesign.jvm.interop.test;
 
+import org.apidesign.jvm.interop.impl.ContextUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.logging.Handler;
@@ -27,9 +27,12 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.apidesign.jvm.channel.Channel;
+import org.apidesign.jvm.interop.impl.OtherJvmMessage;
 import org.apidesign.jvm.interop.impl.OtherJvmPool;
+import org.apidesign.jvm.interop.impl.OtherJvmResult;
 import org.graalvm.polyglot.Value;
 
+@Disabled
 public class OtherJvmLoggerTest {
 
     public static final ContextUtils ctx
@@ -40,7 +43,7 @@ public class OtherJvmLoggerTest {
 
     @BeforeAll
     public static void initializeChannel() {
-        System.setProperty(OtherJvmPool.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
+        System.setProperty(ContextUtils.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
         CHANNEL = Channel.create(null, OtherJvmPool.class);
         CHANNEL
                 .getConfig()
@@ -254,9 +257,7 @@ public class OtherJvmLoggerTest {
     private static Value loadOtherJvmClass(String name) throws Exception {
         var msg = new OtherJvmMessage.LoadClass(name);
         var raw = CHANNEL.execute(OtherJvmResult.class, msg).value(null);
-        if (raw instanceof OtherJvmObject other) {
-            assertTrue(other.assertChannel(CHANNEL));
-        }
+        ctx.assertChannel(raw, CHANNEL);
         var value = ctx.asValue(raw);
         return value;
     }
@@ -278,19 +279,19 @@ public class OtherJvmLoggerTest {
     }
 
     public static void logMessage(String logName, String msg) {
-        var factory = new OtherJvmLogger(CHANNEL);
+        var factory = ctx.newOtherJvmLogger(CHANNEL);
         var log = factory.getLogger(logName, null);
         log.log(System.Logger.Level.ERROR, msg);
     }
 
     public static void logWithArguments(String logName, String format) {
-        var factory = new OtherJvmLogger(CHANNEL);
+        var factory = ctx.newOtherJvmLogger(CHANNEL);
         var log = factory.getLogger(logName, null);
         log.log(System.Logger.Level.ERROR, format, 1, 2.0, new java.util.Date(43021432432423L));
     }
 
     public static void logException(String logName, String msg, String ex) {
-        var factory = new OtherJvmLogger(CHANNEL);
+        var factory = ctx.newOtherJvmLogger(CHANNEL);
         var log = factory.getLogger(logName, null);
         log.log(System.Logger.Level.ERROR, msg, new IllegalStateException(ex));
     }

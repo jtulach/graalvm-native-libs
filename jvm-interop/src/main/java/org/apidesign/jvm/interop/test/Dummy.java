@@ -11,16 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-module org.apidesign.jvm.interop {
-    requires org.apidesign.jvm.channel;
-    requires org.apidesign.jvm.persist;
-    requires org.graalvm.truffle;
-    requires org.graalvm.polyglot;
+package org.apidesign.jvm.interop.test;
 
-    exports org.apidesign.jvm.interop;
-    opens org.apidesign.jvm.interop.impl to
-        org.apidesign.jvm.channel;
-
-    /* only needed for testing purposes */
-    opens org.apidesign.jvm.interop.test;
+public final class Dummy {
+    private Dummy() {
+    }
 }

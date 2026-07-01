@@ -49,6 +49,13 @@
             <type>jar</type>
         </dependency>
         <dependency>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js-language</artifactId>
+            <version>25.0.3</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.graalvm.truffle</groupId>
             <artifactId>truffle-dsl-processor</artifactId>
             <version>25.0.3</version>
