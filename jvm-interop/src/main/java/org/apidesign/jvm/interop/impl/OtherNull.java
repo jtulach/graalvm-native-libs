@@ -20,12 +20,13 @@ import com.oracle.truffle.api.library.ExportMessage;
 
 @ExportLibrary(InteropLibrary.class)
 final class OtherNull implements TruffleObject {
-  static final OtherNull NULL = new OtherNull();
+    static final OtherNull NULL = new OtherNull();
 
-  private OtherNull() {}
+    private OtherNull() {
+    }
 
-  @ExportMessage
-  boolean isNull() {
-    return true;
-  }
+    @ExportMessage
+    boolean isNull() {
+        return true;
+    }
 }

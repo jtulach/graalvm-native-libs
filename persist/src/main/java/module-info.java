@@ -11,16 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.jvm.interop.impl;
-
-import com.oracle.truffle.api.exception.AbstractTruffleException;
-
-public final class OtherJvmException extends AbstractTruffleException {
-    OtherJvmException(String message) {
-        super(message);
-    }
-
-    public OtherJvmException(Throwable toWrap) {
-        super(toWrap.getMessage(), toWrap, UNLIMITED_STACK_TRACE, null);
-    }
+module org.apidesign.jvm.persist {
+    exports org.apidesign.jvm.persist
+        to org.apidesign.jvm.interop;
 }

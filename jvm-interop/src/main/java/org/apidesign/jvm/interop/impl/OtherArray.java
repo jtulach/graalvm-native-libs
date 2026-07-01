@@ -21,32 +21,32 @@ import com.oracle.truffle.api.library.ExportMessage;
 
 @ExportLibrary(InteropLibrary.class)
 final class OtherArray implements TruffleObject {
-  private final TruffleObject[] arr;
+    private final TruffleObject[] arr;
 
-  OtherArray(TruffleObject... arr) {
-    this.arr = arr;
-  }
-
-  @ExportMessage
-  boolean hasArrayElements() {
-    return true;
-  }
-
-  @ExportMessage
-  long getArraySize() {
-    return arr.length;
-  }
-
-  @ExportMessage
-  boolean isArrayElementReadable(long index) {
-    return index >= 0 && index < arr.length;
-  }
-
-  @ExportMessage
-  TruffleObject readArrayElement(long index) throws InvalidArrayIndexException {
-    if (!isArrayElementReadable(index)) {
-      throw InvalidArrayIndexException.create(index);
+    OtherArray(TruffleObject... arr) {
+        this.arr = arr;
     }
-    return arr[Math.toIntExact(index)];
-  }
+
+    @ExportMessage
+    boolean hasArrayElements() {
+        return true;
+    }
+
+    @ExportMessage
+    long getArraySize() {
+        return arr.length;
+    }
+
+    @ExportMessage
+    boolean isArrayElementReadable(long index) {
+        return index >= 0 && index < arr.length;
+    }
+
+    @ExportMessage
+    TruffleObject readArrayElement(long index) throws InvalidArrayIndexException {
+        if (!isArrayElementReadable(index)) {
+            throw InvalidArrayIndexException.create(index);
+        }
+        return arr[Math.toIntExact(index)];
+    }
 }

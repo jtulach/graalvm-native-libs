@@ -11,10 +11,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.jvm.interop;
+package org.apidesign.jvm.persist;
 
-/** Testing {@link Context} utilities.
- */
-final class ContextUtils {
+import java.lang.System.Logger;
 
+final class PerUtils {
+  private PerUtils() {}
+
+  static final Logger LOG = System.getLogger(Persistance.class.getPackageName());
+
+  @SuppressWarnings("unchecked")
+  static <E extends Throwable> E raise(Class<E> clazz, Throwable t) throws E {
+    throw (E) t;
+  }
 }

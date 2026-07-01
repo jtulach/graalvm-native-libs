@@ -19,6 +19,9 @@ import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.Message;
 import com.oracle.truffle.api.nodes.Node;
+import java.io.IOException;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,209 +29,237 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.apidesign.jvm.channel.Channel;
+import org.apidesign.jvm.persist.Persistance;
 
-/** Pool of Truffle objects associated with {@link Channel}. */
+/**
+ * Pool of Truffle objects associated with {@link Channel}.
+ */
 public final class OtherJvmPool extends Channel.Config {
-  /**
-   * @GuardedBy("this")
-   */
-  private long idCounter;
 
-  private final Map<Long, TruffleObject> objectsById = new HashMap<>();
-  private final Map<TruffleObject, Long> objectsToId = new HashMap<>();
-  private final Map<Long, OtherJvmObject> incomming = new HashMap<>();
+    /**
+     * @GuardedBy("this")
+     */
+    private long idCounter;
 
-  /** context to use when entering tests */
-  private OtherJvmLoader loader;
+    private final Map<Long, TruffleObject> objectsById = new HashMap<>();
+    private final Map<TruffleObject, Long> objectsToId = new HashMap<>();
+    private final Map<Long, OtherJvmObject> incomming = new HashMap<>();
 
-  private Function<String, Object> polyglotBindings;
-  private Function<Node, Object> onEnter;
-  private BiConsumer<Node, Object> onLeave;
-  private Class<? extends TruffleLanguage> language;
+    /**
+     * context to use when entering tests
+     */
+    private OtherJvmLoader loader;
 
-  /**
-   * Master Channel can be associated with actions on enter and on leave. This method can be called
-   * only once - then all the provided values are considered constant and immutable.
-   *
-   * @param self the channel this pool is associated to
-   * @param lang language objects produced by this pool should be associated to - can be {@code
-   *     null}
-   * @param polyglotBindings function resolving polyglot bindings or {@code null}
-   * @param onEnter function to be called when entering the evaluation or {@code null}
-   * @param onLeave function to be called when leaving the evaluation or {@code null}
-   */
-  public final void onEnterLeave(
-      Channel<OtherJvmPool> self,
-      Class<? extends TruffleLanguage> lang,
-      Function<String, Object> polyglotBindings,
-      Function<Node, Object> onEnter,
-      BiConsumer<Node, Object> onLeave) {
-    assert self.getConfig() == this;
-    assert self.isMaster();
-    assert this.language == null;
-    assert this.polyglotBindings == null;
-    assert this.onEnter == null;
-    assert this.onLeave == null;
+    private Function<String, Object> polyglotBindings;
+    private Function<Node, Object> onEnter;
+    private BiConsumer<Node, Object> onLeave;
+    private Class<? extends TruffleLanguage> language;
 
-    this.language = lang;
-    this.polyglotBindings = polyglotBindings;
-    this.onEnter = onEnter;
-    this.onLeave = onLeave;
-  }
+    /**
+     * pool associated with this channel
+     */
+    private Persistance.Pool pool;
 
-  public final synchronized void close(Channel<OtherJvmPool> ch) throws Exception {
-    this.language = null;
-    this.polyglotBindings = null;
-    this.onEnter = null;
-    this.onLeave = null;
-    this.loader = null;
-    this.objectsById.clear();
-    this.objectsToId.clear();
-    this.incomming.clear();
-    ch.close();
-    assert ch.getConfig() == this;
-    OtherJvmRef.closeChannel(ch);
-  }
+    /**
+     * Master Channel can be associated with actions on enter and on leave. This
+     * method can be called only once - then all the provided values are
+     * considered constant and immutable.
+     *
+     * @param self the channel this pool is associated to
+     * @param lang language objects produced by this pool should be associated
+     * to - can be {@code
+     *     null}
+     * @param polyglotBindings function resolving polyglot bindings or
+     * {@code null}
+     * @param onEnter function to be called when entering the evaluation or
+     * {@code null}
+     * @param onLeave function to be called when leaving the evaluation or
+     * {@code null}
+     */
+    public final void onEnterLeave(
+            Channel<OtherJvmPool> self,
+            Class<? extends TruffleLanguage> lang,
+            Function<String, Object> polyglotBindings,
+            Function<Node, Object> onEnter,
+            BiConsumer<Node, Object> onLeave) {
+        assert self.getConfig() == this;
+        assert self.isMaster();
+        assert this.language == null;
+        assert this.polyglotBindings == null;
+        assert this.onEnter == null;
+        assert this.onLeave == null;
 
-  final boolean hasLanguage() {
-    return language != null;
-  }
-
-  final Class<? extends TruffleLanguage> getLanguage() throws UnsupportedMessageException {
-    var l = language;
-    if (l == null) {
-      throw UnsupportedMessageException.create();
-    } else {
-      return l;
+        this.language = lang;
+        this.polyglotBindings = polyglotBindings;
+        this.onEnter = onEnter;
+        this.onLeave = onLeave;
     }
-  }
 
-  /**
-   * Registers an instance of Truffle interop object before sending it to the "other JVM". The
-   * system can lookup existing ID for the object - useful for sharing IDs/instances of
-   * <em>immutable objects</em> like {@link Class}es.
-   *
-   * @param obj the object to find ID for
-   * @param cacheIds should the IDs be cached
-   * @return identification ID that can be fed into {@link #findObject} later
-   * @see #findObject
-   */
-  private synchronized long registerObject(TruffleObject obj, boolean cacheIds) {
-    assert !(obj instanceof OtherJvmObject)
-        : "It should be real truffle object, not just a proxy: " + obj;
-    var id = cacheIds ? objectsToId.get(obj) : null;
-    if (id == null) {
-      id = ++idCounter;
-      objectsById.put(id, obj);
-      if (cacheIds) {
-        objectsToId.put(obj, id);
-      }
+    public final synchronized void close(Channel<OtherJvmPool> ch) throws Exception {
+        this.language = null;
+        this.polyglotBindings = null;
+        this.onEnter = null;
+        this.onLeave = null;
+        this.loader = null;
+        this.objectsById.clear();
+        this.objectsToId.clear();
+        this.incomming.clear();
+        ch.close();
+        assert ch.getConfig() == this;
+        OtherJvmRef.closeChannel(ch);
     }
-    return id;
-  }
 
-  /**
-   * Looks an object registered by {@link #registerObject} up.
-   *
-   * @param id the ID to look up
-   * @return object with assigned ID or {@code null}
-   */
-  final synchronized TruffleObject findObject(long id) {
-    return objectsById.get(id);
-  }
-
-  final synchronized void gc(long id) {
-    var prev = objectsById.remove(id);
-    assert prev != null : dumpIds("Each id is removed only once, but " + id);
-  }
-
-  private String dumpIds(String msg) {
-    var sb = new StringBuilder();
-    sb.append(msg);
-    for (var e : objectsById.entrySet()) {
-      sb.append("\n  " + e.getKey() + " => " + e.getValue());
+    final boolean hasLanguage() {
+        return language != null;
     }
-    for (var e : objectsToId.entrySet()) {
-      sb.append("\n  " + e.getKey() + " #" + e.getValue());
+
+    final Class<? extends TruffleLanguage> getLanguage() throws UnsupportedMessageException {
+        var l = language;
+        if (l == null) {
+            throw UnsupportedMessageException.create();
+        } else {
+            return l;
+        }
     }
-    return sb.toString();
-  }
 
-  private final synchronized OtherJvmObject findCached(OtherJvmObject withId) {
-    var existing = incomming.get(withId.id());
-    if (existing == null) {
-      incomming.put(withId.id(), withId);
-      return withId;
-    } else {
-      return existing;
+    /**
+     * Registers an instance of Truffle interop object before sending it to the
+     * "other JVM". The system can lookup existing ID for the object - useful
+     * for sharing IDs/instances of
+     * <em>immutable objects</em> like {@link Class}es.
+     *
+     * @param obj the object to find ID for
+     * @param cacheIds should the IDs be cached
+     * @return identification ID that can be fed into {@link #findObject} later
+     * @see #findObject
+     */
+    private synchronized long registerObject(TruffleObject obj, boolean cacheIds) {
+        assert !(obj instanceof OtherJvmObject) : "It should be real truffle object, not just a proxy: " + obj;
+        var id = cacheIds ? objectsToId.get(obj) : null;
+        if (id == null) {
+            id = ++idCounter;
+            objectsById.put(id, obj);
+            if (cacheIds) {
+                objectsToId.put(obj, id);
+            }
+        }
+        return id;
     }
-  }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public final Persistance.Pool createPool(Channel<?> rawChannel) {
-    var channel = (Channel<OtherJvmPool>) rawChannel;
-    if (channel.isDualJvmMode() && !channel.isMaster()) {
-      OtherJvmLogger.initialize(channel);
+    /**
+     * Looks an object registered by {@link #registerObject} up.
+     *
+     * @param id the ID to look up
+     * @return object with assigned ID or {@code null}
+     */
+    final synchronized TruffleObject findObject(long id) {
+        return objectsById.get(id);
     }
-    var withRead =
-        Persistables.POOL.withReadResolve(
-            obj -> {
-              return OtherJvmObject.readResolve(channel, obj, this::findObject, this::findCached);
-            });
-    var withReadAndWrite =
-        withRead.withWriteReplace(
-            obj -> {
-              var prev = enter(channel, null);
-              try {
-                return OtherJvmObject.writeReplace(obj, this::registerObject);
-              } finally {
-                leave(channel, null, prev);
-              }
-            });
-    return withReadAndWrite;
-  }
 
-  final Object enter(Channel<OtherJvmPool> channel, Node node) {
-    if (channel.isMaster()) {
-      if (onEnter != null) {
-        return onEnter.apply(node);
-      }
-    } else {
-      loader(channel).ctx.enter();
+    final synchronized void gc(long id) {
+        var prev = objectsById.remove(id);
+        assert prev != null : dumpIds("Each id is removed only once, but " + id);
     }
-    return null;
-  }
 
-  final void leave(Channel<OtherJvmPool> master, Node node, Object prev) {
-    if (master.isMaster()) {
-      if (onLeave != null) {
-        onLeave.accept(node, prev);
-      }
-    } else {
-      loader(master).ctx.leave();
+    private String dumpIds(String msg) {
+        var sb = new StringBuilder();
+        sb.append(msg);
+        for (var e : objectsById.entrySet()) {
+            sb.append("\n  " + e.getKey() + " => " + e.getValue());
+        }
+        for (var e : objectsToId.entrySet()) {
+            sb.append("\n  " + e.getKey() + " #" + e.getValue());
+        }
+        return sb.toString();
     }
-  }
 
-  void addToClassPath(Channel<OtherJvmPool> channel, String file) {
-    loader(channel).addToClassPath(file);
-  }
+    private final synchronized OtherJvmObject findCached(OtherJvmObject withId) {
+        var existing = incomming.get(withId.id());
+        if (existing == null) {
+            incomming.put(withId.id(), withId);
+            return withId;
+        } else {
+            return existing;
+        }
+    }
 
-  void findLibraries(Channel<OtherJvmPool> channel, TruffleObject file) {
-    loader(channel).findLibraries(file);
-  }
+    @Override
+    public Object read(ByteBuffer buf) throws IOException {
+        var ref = pool.read(buf);
+        return ref.get(Object.class);
+    }
 
-  final TruffleObject loadClassObject(Channel<OtherJvmPool> master, String className)
-      throws ClassNotFoundException {
-    var clazz = loader(master).loadClassObject(className);
-    return clazz;
-  }
+    @Override
+    public void write(Object obj, ByteBuffer buf) throws IOException, BufferOverflowException {
+        var arr = pool.write(obj);
+        buf.put(arr);
+    }
 
-  private final synchronized OtherJvmLoader loader(Channel<OtherJvmPool> channel) {
-    assert !channel.isMaster() : "Cannot handle classloading in master, only in slave";
-    if (loader == null) {
-      loader = new OtherJvmLoader();
-      /* XXX: Not needed now.
+    @SuppressWarnings("unchecked")
+    @Override
+    public void withChannel(Channel<?> rawChannel) {
+        var channel = (Channel<OtherJvmPool>) rawChannel;
+        if (channel.isDualJvmMode() && !channel.isMaster()) {
+            OtherJvmLogger.initialize(channel);
+        }
+        var withRead
+                = Persistables.POOL.withReadResolve(
+                        obj -> {
+                            return OtherJvmObject.readResolve(channel, obj, this::findObject, this::findCached);
+                        });
+        var withReadAndWrite
+                = withRead.withWriteReplace(
+                        obj -> {
+                            var prev = enter(channel, null);
+                            try {
+                                return OtherJvmObject.writeReplace(obj, this::registerObject);
+                            } finally {
+                                leave(channel, null, prev);
+                            }
+                        });
+        this.pool = withReadAndWrite;
+    }
+
+    final Object enter(Channel<OtherJvmPool> channel, Node node) {
+        if (channel.isMaster()) {
+            if (onEnter != null) {
+                return onEnter.apply(node);
+            }
+        } else {
+            loader(channel).ctx.enter();
+        }
+        return null;
+    }
+
+    final void leave(Channel<OtherJvmPool> master, Node node, Object prev) {
+        if (master.isMaster()) {
+            if (onLeave != null) {
+                onLeave.accept(node, prev);
+            }
+        } else {
+            loader(master).ctx.leave();
+        }
+    }
+
+    void addToClassPath(Channel<OtherJvmPool> channel, String file) {
+        loader(channel).addToClassPath(file);
+    }
+
+    void findLibraries(Channel<OtherJvmPool> channel, TruffleObject file) {
+        loader(channel).findLibraries(file);
+    }
+
+    final TruffleObject loadClassObject(Channel<OtherJvmPool> master, String className)
+            throws ClassNotFoundException {
+        var clazz = loader(master).loadClassObject(className);
+        return clazz;
+    }
+
+    private final synchronized OtherJvmLoader loader(Channel<OtherJvmPool> channel) {
+        assert !channel.isMaster() : "Cannot handle classloading in master, only in slave";
+        if (loader == null) {
+            loader = new OtherJvmLoader();
+            /* XXX: Not needed now.
       loader
           .ctx
           .getPolyglotBindings()
@@ -240,141 +271,141 @@ public final class OtherJvmPool extends Channel.Config {
                     var res = channel.execute(Object.class, msg);
                     return res;
                   });
-      */
+             */
+        }
+        return loader;
     }
-    return loader;
-  }
 
-  //
-  // Support for histogram of messages
-  //
+    //
+    // Support for histogram of messages
+    //
+    static final String DUMP_MESSAGE_PROPERTY = "org.apidesign.jvm.interop.limit";
+    private static final int DUMP_MESSAGE_STACK_SIZE = 8;
 
-  static final String DUMP_MESSAGE_PROPERTY = "org.apidesign.jvm.interop.limit";
-  private static final int DUMP_MESSAGE_STACK_SIZE = 8;
+    /**
+     * @GuardedBy("this")
+     */
+    private Map<Message, WhereAndCount> histogram;
 
-  /**
-   * @GuardedBy("this")
-   */
-  private Map<Message, WhereAndCount> histogram;
+    /**
+     * Enable histogram of messages for example by:
+     *
+     * <pre>
+     * java
+     *    -D=org.apidesign.jvm.interop.limit=100000
+     * </pre>
+     *
+     * @GuardedBy("this")
+     */
+    private int countMessages;
 
-  /**
-   * Enable histogram of messages for example by:
-   *
-   * <pre>
-   * java
-   *    -D=org.apidesign.jvm.interop.limit=100000
-   * </pre>
-   *
-   * @GuardedBy("this")
-   */
-  private int countMessages;
+    /**
+     * @GuardedBy("this")
+     */
+    private long countSince;
 
-  /**
-   * @GuardedBy("this")
-   */
-  private long countSince;
-
-  final void profileMessage(Message message, Object[] args) {
-    incrementMessage(message);
-  }
-
-  private synchronized void incrementMessage(Message message) {
-    if (countMessages == Integer.MIN_VALUE) {
-      // disabled
-      return;
+    final void profileMessage(Message message, Object[] args) {
+        incrementMessage(message);
     }
-    if (histogram == null) {
-      resetCountMessages(true);
-      if (countMessages < 0) {
-        return;
-      }
-      histogram = new ConcurrentHashMap<>();
+
+    private synchronized void incrementMessage(Message message) {
+        if (countMessages == Integer.MIN_VALUE) {
+            // disabled
+            return;
+        }
+        if (histogram == null) {
+            resetCountMessages(true);
+            if (countMessages < 0) {
+                return;
+            }
+            histogram = new ConcurrentHashMap<>();
+        }
+        var withCount = histogram.computeIfAbsent(message, (ignore) -> new WhereAndCount());
+        withCount.count++;
+        if (--countMessages <= 0) {
+            dumpMessagesAndReset();
+        }
     }
-    var withCount = histogram.computeIfAbsent(message, (ignore) -> new WhereAndCount());
-    withCount.count++;
-    if (--countMessages <= 0) {
-      dumpMessagesAndReset();
+
+    private synchronized void resetCountMessages(boolean forceInit) {
+        var newValue = Integer.getInteger(DUMP_MESSAGE_PROPERTY, Integer.MIN_VALUE);
+        if (forceInit || newValue != Integer.MAX_VALUE) {
+            countMessages = newValue;
+            countSince = System.currentTimeMillis();
+        }
     }
-  }
 
-  private synchronized void resetCountMessages(boolean forceInit) {
-    var newValue = Integer.getInteger(DUMP_MESSAGE_PROPERTY, Integer.MIN_VALUE);
-    if (forceInit || newValue != Integer.MAX_VALUE) {
-      countMessages = newValue;
-      countSince = System.currentTimeMillis();
+    private synchronized Map<Message, WhereAndCount> clearMessages(StringBuilder sb) {
+        var prev = histogram;
+        histogram = null;
+        var took = System.currentTimeMillis() - countSince;
+        countSince = System.currentTimeMillis();
+        var jvm = System.getProperty("java.vm.name");
+        if (jvm == null) {
+            jvm = "JVM";
+        }
+        sb.append("\n======== Interop %s Messages Chart in last %d ms ========\n".formatted(jvm, took));
+        return prev;
     }
-  }
 
-  private synchronized Map<Message, WhereAndCount> clearMessages(StringBuilder sb) {
-    var prev = histogram;
-    histogram = null;
-    var took = System.currentTimeMillis() - countSince;
-    countSince = System.currentTimeMillis();
-    var jvm = System.getProperty("java.vm.name");
-    if (jvm == null) {
-      jvm = "JVM";
+    @CompilerDirectives.TruffleBoundary
+    private void dumpMessagesAndReset() {
+        var sb = new StringBuilder();
+        var prev = clearMessages(sb);
+        var logger = System.getLogger("org.apidesign.jvm.interop");
+        logger.log(System.Logger.Level.ERROR, dumpMessages(sb, prev));
+        resetCountMessages(false);
     }
-    sb.append("\n======== Interop %s Messages Chart in last %d ms ========\n".formatted(jvm, took));
-    return prev;
-  }
 
-  @CompilerDirectives.TruffleBoundary
-  private void dumpMessagesAndReset() {
-    var sb = new StringBuilder();
-    var prev = clearMessages(sb);
-    var logger = System.getLogger("org.apidesign.jvm.interop");
-    logger.log(System.Logger.Level.ERROR, dumpMessages(sb, prev));
-    resetCountMessages(false);
-  }
-
-  private static String dumpMessages(StringBuilder sb, Map<Message, WhereAndCount> prev) {
-    if (prev == null) {
-      return sb.toString();
+    private static String dumpMessages(StringBuilder sb, Map<Message, WhereAndCount> prev) {
+        if (prev == null) {
+            return sb.toString();
+        }
+        prev.entrySet().stream()
+                .sorted(
+                        (a, b) -> {
+                            return b.getValue().count - a.getValue().count;
+                        })
+                .limit(10)
+                .forEach(
+                        (e) -> {
+                            sb.append("%8d %s\n".formatted(e.getValue().count, e.getKey()));
+                            Stream.of(e.getValue().getStackTrace())
+                                    .map(StackTraceElement::toString)
+                                    .dropWhile(
+                                            l
+                                            -> l.contains("org.apidesign.jvm.interop")
+                                            || l.contains("java.base")
+                                            || l.contains("org.graalvm.truffle"))
+                                    .limit(DUMP_MESSAGE_STACK_SIZE)
+                                    .map("          at %s\n"::formatted)
+                                    .forEach(sb::append);
+                        });
+        return sb.toString();
     }
-    prev.entrySet().stream()
-        .sorted(
-            (a, b) -> {
-              return b.getValue().count - a.getValue().count;
-            })
-        .limit(10)
-        .forEach(
-            (e) -> {
-              sb.append("%8d %s\n".formatted(e.getValue().count, e.getKey()));
-              Stream.of(e.getValue().getStackTrace())
-                  .map(StackTraceElement::toString)
-                  .dropWhile(
-                      l ->
-                          l.contains("org.apidesign.jvm.interop")
-                              || l.contains("java.base")
-                              || l.contains("org.graalvm.truffle"))
-                  .limit(DUMP_MESSAGE_STACK_SIZE)
-                  .map("          at %s\n"::formatted)
-                  .forEach(sb::append);
-            });
-    return sb.toString();
-  }
 
-  final void assertMessagesCount(String msg, int cnt, Runnable run) {
-    clearMessages(new StringBuilder());
-    countMessages = cnt;
-    run.run();
-    if (countMessages < 0) {
-      var sb = new StringBuilder();
-      sb.append(msg)
-          .append(", expected at most ")
-          .append(cnt)
-          .append(" messages, but was ")
-          .append(-countMessages)
-          .append(" more");
-      throw new AssertionError(sb.toString());
+    final void assertMessagesCount(String msg, int cnt, Runnable run) {
+        clearMessages(new StringBuilder());
+        countMessages = cnt;
+        run.run();
+        if (countMessages < 0) {
+            var sb = new StringBuilder();
+            sb.append(msg)
+                    .append(", expected at most ")
+                    .append(cnt)
+                    .append(" messages, but was ")
+                    .append(-countMessages)
+                    .append(" more");
+            throw new AssertionError(sb.toString());
+        }
     }
-  }
 
-  final Object getBindings(String name) {
-    return polyglotBindings == null ? null : polyglotBindings.apply(name);
-  }
+    final Object getBindings(String name) {
+        return polyglotBindings == null ? null : polyglotBindings.apply(name);
+    }
 
-  private static final class WhereAndCount extends Exception {
-    int count;
-  }
+    private static final class WhereAndCount extends Exception {
+
+        int count;
+    }
 }

@@ -29,6 +29,8 @@
     
     <modules>
         <module>jvm-channel</module>
+        <module>persist-dsl</module>
+        <module>persist</module>
         <module>jvm-interop</module>
         <module>examples/jvmlauncher</module>
         <module>examples/jvmchannel</module>
@@ -108,6 +110,7 @@
                         <target>25</target>
                         <compilerArgs>
                             <arg>-Xlint:deprecation</arg>
+                            <arg>-proc:full</arg>
                         </compilerArgs>
                     </configuration>
                 </plugin>

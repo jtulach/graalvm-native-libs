@@ -22,15 +22,16 @@ import com.oracle.truffle.api.nodes.Node;
  * @param <E> the type of exception when the operation fails
  */
 public sealed interface OtherJvmResult<R, E extends Throwable> // Either R or E
-    permits OtherJvmMessage.ReturnValue,
+        permits OtherJvmMessage.ReturnValue,
         OtherJvmMessage.ThrowValue,
         OtherJvmMessage.ThrowException {
-  /**
-   * Either returns the computed result or throws exception.
-   *
-   * @param location who's querying?
-   * @return the value
-   * @throws the exception if value couldn't be computed
-   */
-  R value(Node location) throws E;
+
+    /**
+     * Either returns the computed result or throws exception.
+     *
+     * @param location who's querying?
+     * @return the value
+     * @throws the exception if value couldn't be computed
+     */
+    R value(Node location) throws E;
 }

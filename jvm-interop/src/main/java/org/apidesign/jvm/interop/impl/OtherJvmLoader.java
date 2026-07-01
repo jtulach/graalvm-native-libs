@@ -25,72 +25,75 @@ import java.net.URLClassLoader;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 
-/** Handles classloading in the "slave" JVM. */
+/**
+ * Handles classloading in the "slave" JVM.
+ */
 final class OtherJvmLoader extends URLClassLoader {
-  final Context ctx;
-  private TruffleObject findLibraries;
+    final Context ctx;
+    private TruffleObject findLibraries;
 
-  OtherJvmLoader() {
-    super(new URL[0]);
-    ctx =
-        Context.newBuilder("host") // no dynamic languages needed
-            .allowHostAccess(HostAccess.ALL) // all public members
-            .allowExperimentalOptions(true) // to survive any -Dpolyglot options
-            .build();
-  }
-
-  final void addToClassPath(String file) {
-    try {
-      addURL(new File(file).toURI().toURL());
-    } catch (MalformedURLException ex) {
-      ex.printStackTrace();
+    OtherJvmLoader() {
+        super(new URL[0]);
+        ctx
+                = Context.newBuilder("host") // no dynamic languages needed
+                        .allowHostAccess(HostAccess.ALL) // all public members
+                        .allowExperimentalOptions(true) // to survive any -Dpolyglot options
+                        .build();
     }
-  }
 
-  final void findLibraries(TruffleObject obj) {
-    this.findLibraries = obj;
-  }
-
-  @Override
-  protected String findLibrary(String libName) {
-    var find = this.findLibraries;
-    if (find != null) {
-      try {
-        var iop = InteropLibrary.getUncached();
-        var mayBePath = iop.execute(find, libName);
-        if (iop.isString(mayBePath)) {
-          return iop.asString(mayBePath);
+    final void addToClassPath(String file) {
+        try {
+            addURL(new File(file).toURI().toURL());
+        } catch (MalformedURLException ex) {
+            ex.printStackTrace();
         }
-      } catch (InteropException ex) {
-        var logger = System.getLogger("org.apidesign.jvm.interop");
-        logger.log(System.Logger.Level.WARNING, ex);
-      }
-    }
-    return null;
-  }
-
-  final TruffleObject loadClassObject(String className) throws ClassNotFoundException {
-    var clazz = loadClass(className);
-    var clazzValue1 = ctx.asValue(clazz);
-    var clazzValue2 = clazzValue1.getMember("static");
-    var unwrap = new Unwrap();
-    ctx.asValue(unwrap).execute(clazzValue2);
-    return (TruffleObject) unwrap.value;
-  }
-
-  @ExportLibrary(value = InteropLibrary.class)
-  static final class Unwrap implements TruffleObject {
-    TruffleObject value;
-
-    @ExportMessage
-    final Object execute(Object[] values) {
-      this.value = (TruffleObject) values[0];
-      return this;
     }
 
-    @ExportMessage
-    final boolean isExecutable() {
-      return true;
+    final void findLibraries(TruffleObject obj) {
+        this.findLibraries = obj;
     }
-  }
+
+    @Override
+    protected String findLibrary(String libName) {
+        var find = this.findLibraries;
+        if (find != null) {
+            try {
+                var iop = InteropLibrary.getUncached();
+                var mayBePath = iop.execute(find, libName);
+                if (iop.isString(mayBePath)) {
+                    return iop.asString(mayBePath);
+                }
+            } catch (InteropException ex) {
+                var logger = System.getLogger("org.apidesign.jvm.interop");
+                logger.log(System.Logger.Level.WARNING, ex);
+            }
+        }
+        return null;
+    }
+
+    final TruffleObject loadClassObject(String className) throws ClassNotFoundException {
+        var clazz = loadClass(className);
+        var clazzValue1 = ctx.asValue(clazz);
+        var clazzValue2 = clazzValue1.getMember("static");
+        var unwrap = new Unwrap();
+        ctx.asValue(unwrap).execute(clazzValue2);
+        return (TruffleObject) unwrap.value;
+    }
+
+    @ExportLibrary(value = InteropLibrary.class)
+    static final class Unwrap implements TruffleObject {
+
+        TruffleObject value;
+
+        @ExportMessage
+        final Object execute(Object[] values) {
+            this.value = (TruffleObject) values[0];
+            return this;
+        }
+
+        @ExportMessage
+        final boolean isExecutable() {
+            return true;
+        }
+    }
 }

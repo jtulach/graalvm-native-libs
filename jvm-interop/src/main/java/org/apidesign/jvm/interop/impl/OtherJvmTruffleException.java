@@ -23,32 +23,33 @@ import com.oracle.truffle.api.nodes.Node;
 
 @ExportLibrary(delegateTo = "delegate", value = InteropLibrary.class)
 final class OtherJvmTruffleException extends AbstractTruffleException {
-  final OtherJvmObject delegate;
 
-  OtherJvmTruffleException(String message, OtherJvmObject delegate, Node location) {
-    super(message, location);
-    assert delegate != null && InteropLibrary.getUncached().isException(delegate);
-    this.delegate = delegate;
-    TruffleStackTrace.fillIn(this);
-  }
+    final OtherJvmObject delegate;
 
-  @ExportMessage
-  boolean isException() {
-    return true;
-  }
+    OtherJvmTruffleException(String message, OtherJvmObject delegate, Node location) {
+        super(message, location);
+        assert delegate != null && InteropLibrary.getUncached().isException(delegate);
+        this.delegate = delegate;
+        TruffleStackTrace.fillIn(this);
+    }
 
-  @ExportMessage
-  OtherJvmTruffleException throwException() {
-    throw this;
-  }
+    @ExportMessage
+    boolean isException() {
+        return true;
+    }
 
-  @ExportMessage
-  boolean hasExceptionStackTrace() {
-    return false;
-  }
+    @ExportMessage
+    OtherJvmTruffleException throwException() {
+        throw this;
+    }
 
-  @ExportMessage
-  Object getExceptionStackTrace() throws UnsupportedMessageException {
-    throw UnsupportedMessageException.create();
-  }
+    @ExportMessage
+    boolean hasExceptionStackTrace() {
+        return false;
+    }
+
+    @ExportMessage
+    Object getExceptionStackTrace() throws UnsupportedMessageException {
+        throw UnsupportedMessageException.create();
+    }
 }

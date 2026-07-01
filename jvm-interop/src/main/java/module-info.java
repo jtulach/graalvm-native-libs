@@ -13,7 +13,11 @@
  */
 module org.apidesign.jvm.interop {
     requires org.apidesign.jvm.channel;
+    requires org.apidesign.jvm.persist;
     requires org.graalvm.truffle;
-    exports org.apidesign.jvm.interop;
     requires org.graalvm.polyglot;
+
+    exports org.apidesign.jvm.interop;
+    opens org.apidesign.jvm.interop.impl to
+        org.apidesign.jvm.channel;
 }
