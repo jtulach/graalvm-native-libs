@@ -13,6 +13,7 @@
  */
 package org.apidesign.jvm.interop.impl;
 
+import com.oracle.truffle.api.exception.AbstractTruffleException;
 import java.io.File;
 import java.io.IOException;
 import java.lang.module.ModuleFinder;
@@ -97,5 +98,9 @@ public final class OtherJvmUtils {
         // commandAndArgs.add("-Dslf4j.provider=...");
         // commandAndArgs.add("-Dslf4j.internal.verbosity=WARN");
         return commandAndArgs.toArray(String[]::new);
+    }
+
+    public static boolean isTruffleException(Throwable t) {
+        return t instanceof AbstractTruffleException;
     }
 }

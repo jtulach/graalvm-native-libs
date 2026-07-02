@@ -51,8 +51,8 @@ public final class OtherJvmPool extends Channel.Config {
     private OtherJvmLoader loader;
 
     private Function<String, Object> polyglotBindings;
-    private Function<Node, Object> onEnter;
-    private BiConsumer<Node, Object> onLeave;
+    private Function<? super Node, Object> onEnter;
+    private BiConsumer<? super Node, Object> onLeave;
     private Class<? extends TruffleLanguage> language;
 
     /**
@@ -80,8 +80,8 @@ public final class OtherJvmPool extends Channel.Config {
             Channel<OtherJvmPool> self,
             Class<? extends TruffleLanguage> lang,
             Function<String, Object> polyglotBindings,
-            Function<Node, Object> onEnter,
-            BiConsumer<Node, Object> onLeave) {
+            Function<? super Node, Object> onEnter,
+            BiConsumer<? super Node, Object> onLeave) {
         assert self.getConfig() == this;
         assert self.isMaster();
         assert this.language == null;
