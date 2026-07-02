@@ -107,6 +107,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         this.channelClass = handleClass;
         this.channelHandle = handleFn;
         this.otherMockChannel = null;
+        data.withChannel(this);
     }
 
     /**
