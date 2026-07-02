@@ -22,13 +22,15 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * Central persistance class. Use {@link Pool#write(java.lang.Object, java.util.function.Function)
- * write} method to turn a graph of JVM objects into a {@code byte[]}. <br>
+ * Central persistance class. Use {@link Pool#write write} method to turn
+ * a graph of JVM objects into a {@code byte[]}. <br>
  *
  * {@snippet file="org/apidesign/jvm/persist/PersistanceTest.java" region="write"}
  *
- * <p>Use sibling {@link Persistance.Pool#read read} method to read the byte buffer back into their
- * memory representation. <br>
+ * <p>
+ * Use sibling {@link Persistance.Pool#read read} method to read the byte buffer back into their
+ * memory representation.
+ * </p>
  *
  * {@snippet file="org/apidesign/jvm/persist/PersistanceTest.java" region="read"}
  *
@@ -59,10 +61,10 @@ public abstract class Persistance<T> {
    * {@snippet file="org/apidesign/jvm/persist/PersistanceTest.java" region="manual"}
    *
    * <br>
-   * Each persistance requires unique ID. A stream created by {@link Pool#write(Object,
-   * Function<Object, Object>)} and read by {@link Pool#read(byte[], Function<Object, Object>)}
-   * contains a header derived from the all the IDs present in the system. When versioning the
-   * protocol and implementation:
+   * Each persistance requires unique ID. A stream created by {@link Pool#write} and
+   * read by {@link Pool#read}
+   * contains a header derived from the all the IDs present in the pool.
+   * When versioning the protocol and implementation:
    *
    * <ul>
    *   <li>when you change something really core in the Persitance itself - change the header
@@ -316,9 +318,11 @@ public abstract class Persistance<T> {
    * Reference to an object. Either created directly or obtained from {@link Input#readReference}
    * method.
    *
-   * <p>When reading, the Reference is read lazily, only on demand. When writing, the Reference is
+   * <p>
+   * When reading, the Reference is read lazily, only on demand. When writing, the Reference is
    * deferred towards the end, allowing to handle circular references inside of the serialized
    * structure.
+   * </p>
    *
    * @param <T> expected type of the referenced object
    * @see Input#readReference

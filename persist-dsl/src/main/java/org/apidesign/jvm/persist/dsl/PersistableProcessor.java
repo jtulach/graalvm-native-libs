@@ -56,9 +56,6 @@ import javax.tools.StandardLocation;
 public final class PersistableProcessor extends AbstractProcessor {
     private final Map<String, Map<Integer, String>> registeredClasses = new TreeMap<>();
 
-    public PersistableProcessor() {
-    }
-
     @Override
     public SourceVersion getSupportedSourceVersion() {
         return SourceVersion.latest();

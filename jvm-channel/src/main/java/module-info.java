@@ -11,6 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Use {@link org.apidesign.jvm.channel.JVM} to launch HotSpot JVM or another SVM
+ * in the same process. Use {@link org.apidesign.jvm.channel.Channel} to establish
+ * a communication channel between these two JVMs.
+ */
 module org.apidesign.jvm.channel {
     requires org.graalvm.nativeimage;
     exports org.apidesign.jvm.channel;

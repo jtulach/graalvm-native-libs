@@ -11,6 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/** Serialization/deserialization framework optimized for <em>lazy reading</em>
+ * of parts of the serialized data. See {@link org.apidesign.jvm.persist.Persistance}
+ * for more details.
+ */
 module org.apidesign.jvm.persist {
     exports org.apidesign.jvm.persist
         to org.apidesign.jvm.interop;
