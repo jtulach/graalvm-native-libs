@@ -181,6 +181,7 @@
                         <metadataRepository>
                             <enabled>false</enabled>
                         </metadataRepository>
+                        <skipBaseSBOM>true</skipBaseSBOM>
                     </configuration>
                 </plugin>
                 <plugin>
