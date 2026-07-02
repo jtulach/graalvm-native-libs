@@ -36,3 +36,13 @@ jobs:
     - name: Generate Javadoc
       run: mvn javadoc:jar
 
+    - if: (success() || failure())
+      name: Upload Heap Dumps
+      uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: ignore
+        name: Heap dumps
+        path: |-
+          **/*.hprof
+        retention-days: 3
+

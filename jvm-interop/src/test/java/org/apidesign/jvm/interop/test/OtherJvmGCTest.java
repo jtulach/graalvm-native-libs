@@ -13,6 +13,7 @@
  */
 package org.apidesign.jvm.interop.test;
 
+import java.io.IOException;
 import org.apidesign.jvm.interop.impl.ContextUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -24,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Supplier;
 import org.apidesign.jvm.channel.Channel;
 import org.apidesign.jvm.interop.impl.OtherJvmMessage;
@@ -73,11 +73,11 @@ public class OtherJvmGCTest {
             return last;
         }
 
-        public static void tryAndFailToGC() {
+        public static void tryAndFailToGC() throws IOException {
             assertGC("This should not GC", false, lastCounted::get, null);
         }
 
-        public static void tryAndSucceedWithGC() {
+        public static void tryAndSucceedWithGC() throws IOException {
             assertGC("Now we should GC", true, lastCounted::get, null);
         }
 
@@ -166,7 +166,7 @@ public class OtherJvmGCTest {
         assertGC("Now it the objValue shall be GCed", true, holdValue, "toObj", "flush");
     }
 
-    private Value assertHolderHolds(Value gcClass) {
+    private Value assertHolderHolds(Value gcClass) throws IOException {
         var objValue = gcClass.invokeMember("holdObj", 34);
         var holdValue = objValue.invokeMember("toHolder");
         assertGC("Cannot GC as we have a reference to objValue", false, holdValue, "toObj", "flush");
@@ -196,42 +196,60 @@ public class OtherJvmGCTest {
     private static Runnable globalFlush;
 
     private static void assertGC(
-            String msg, boolean expectGC, Value ref, String methodName, String flushName) {
+        String msg, boolean expectGC, Value ref, String methodName, String flushName
+    ) throws IOException {
         assertGC(
-                msg,
-                expectGC,
-                () -> {
-                    var value = ref.invokeMember(methodName);
-                    return value.isNull() ? null : ctx.unwrapValue(value);
-                },
-                () -> {
-                    ref.invokeMember(flushName);
-                });
+            msg,
+            expectGC,
+            () -> {
+                var value = ref.invokeMember(methodName);
+                return value.isNull() ? null : ctx.unwrapValue(value);
+            },
+            () -> {
+                ref.invokeMember(flushName);
+            }
+        );
     }
 
-    private static void assertGC(String msg, boolean expectGC, Supplier<?> ref, Runnable flush) {
-        List<byte[]> alloc = new ArrayList<>();
+    private static void assertGC(String msg, boolean expectGC, Supplier<?> ref, Runnable flush) throws IOException {
+        var alloc = new ArrayList<byte[]>();
+        var log = new StringBuilder();
         for (var i = 1; i < Integer.MAX_VALUE / 2; i *= 2) {
-            if (isNull(ref)) {
+            if (isNull(ref, log)) {
                 break;
             }
             System.gc();
+            log.append("assertGC: System.gc - done\n");
             if (flush != null) {
                 flush.run();
+                log.append("assertGC: Flushed via ").append(flush).append("\n");
             }
             if (globalFlush != null) {
+                log.append("assertGC: Flushed global via ").append(globalFlush).append("\n");
                 globalFlush.run();
             }
-            alloc.add(new byte[i]);
+            log.append("assertGC: Allocating ").append(i).append(" byte array\n");
+            try {
+                alloc.add(new byte[i]);
+            } catch (OutOfMemoryError err) {
+                System.gc();
+                log.append("assertGC: OutOfMemoryError: ").append(err.getMessage());
+            }
         }
         if (expectGC) {
-            assertNull(ref.get(), msg + " ref still alive " + alloc);
+            log.append("assertGC: Allocated: ");
+            for (var arr : alloc) {
+                log.append("byte[").append(arr.length).append("] ");
+            }
+            assertNull(ref.get(), msg + " ref still alive. Log:\n" + log);
         } else {
             assertNotNull(ref.get(), msg + " ref has been cleaned");
         }
     }
 
-    private static boolean isNull(Supplier<?> ref) {
-        return ref.get() == null;
+    private static boolean isNull(Supplier<?> ref, Appendable log) throws IOException {
+        var value = ref.get();
+        log.append("isNull: " + value + "\n");
+        return value == null;
     }
 }
