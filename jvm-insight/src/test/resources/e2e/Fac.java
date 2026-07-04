@@ -12,8 +12,8 @@
  * limitations under the License.
  */
 
-// $ javac Fac.java PrintingCallback.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fac,methods=.*fac.*,handler=e2e.PrintingCallback Fac
+// $ javac -cp ${jvminsight} Fac.java PrintingCallback.java -g -d ${classes}
+// $ java -cp ${classes} -javaagent:${jvminsight}=e2e.PrintingCallback,classes=.*Fac,methods=.*fac.* Fac
 // > fac(5) = 120
 // 2> [JvmInsightAgent]: Transforming Fac
 // 2> enter Fac.main

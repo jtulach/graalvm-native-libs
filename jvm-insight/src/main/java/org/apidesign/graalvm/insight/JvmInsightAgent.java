@@ -18,48 +18,26 @@ import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
-import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.regex.Pattern;
 
 /** Entry point for using JVM Insight as Java agent. Usage:
  * <pre>
- * java -javaagent:jvm-insight-*.jar Hello.java
+ * java -javaagent:jvm-insight-*.jar=pkg.Clazz Hello.java
  * </pre>
  * where {@code Hello} is a Java file that contains {@code main} method
  * and some other methods to track.
- *
+ * <p>
+ * The {@code pkg.Clazz} must be a public class with a {@code public static}
+ * method called {@code insightmain} that will be called by this agent.
+ * The method shall have two arguments. First {@link String} for arguments
+ * passed when initializing the agent and then an {@link JvmInsight} for
+ * configuring the insight.
+ * The agent will provide them after setting up necessary infrastructure.
+ * </p>
  */
 final class JvmInsightAgent implements ClassFileTransformer {
-    /** Option to select what class to instrument.
-     * Use {@code -javaagent=jvm-insight.jar=classes=.*Reg} to select
-     * what classes to instrument.
-     */
-    private static final String OPT_CLASSES = "classes";
-
-    /** Option to select what method to instrument.
-     * Use {@code -javaagent=jvm-insight.jar=methods=.*Reg} to select
-     * what classes to instrument.
-     */
-    private static final String OPT_METHODS = "methods";
-
-    /** Option to specify a class to callback when an event happens.
-     * The class must be reachable by a application classloader. The
-     * class must be public and must have a default constructor. The
-     * class should implement {@link BiConsumer}{@code <String, Map<String, Object>>}
-     * and then it gets callback with a name of class+method+signature and
-     * access to local variables.
-     *
-     * Use {@code -javaagent=jvm-insight.jar=handler=my.pkg.CallMe} to specify
-     * what classes to instrument.
-     */
-    private static final String OPT_HANDLER = "handler";
-
-    private final JvmInsight global;
+    private final JvmInsight insight;
+    private final Instrumentation instr;
     private final ClassFile clazzFile;
-    private final Pattern pattern;
-    private final Pattern methods;
-    private final BiConsumer<String, Map<String, Object>> handler;
 
     public static void premain(String args, Instrumentation instr) throws Exception {
         registerAgent(args, instr);
@@ -70,55 +48,23 @@ final class JvmInsightAgent implements ClassFileTransformer {
     }
 
     private static void registerAgent(String args, Instrumentation instr) throws Exception {
-        var insight = JvmInsight.enableInstrumentation(instr);
-        Pattern classes = null;
-        Pattern methods = null;
-        BiConsumer<String, Map<String, Object>> handler = null;
+        var agent = new JvmInsightAgent(instr);
 
-        if (args != null) {
-            var segments = args.split(",");
-            for (var seg : segments) {
-                var keyValue = seg.split("=");
-                if (keyValue.length != 2) {
-                    throw new IllegalStateException("Expecting key=value, but was: " + seg);
-                }
-                switch (keyValue[0]) {
-                    case OPT_CLASSES -> {
-                        classes = Pattern.compile(keyValue[1]);
-                    }
-                    case OPT_METHODS -> {
-                        methods = Pattern.compile(keyValue[1]);
-                    }
-                    case OPT_HANDLER -> {
-                        var clazz = Class.forName(keyValue[1], true, ClassLoader.getSystemClassLoader());
-                        handler = (BiConsumer) clazz.getConstructor().newInstance();
-                    }
-                    default -> {
-                        throw new IllegalStateException("Unknown option " + seg);
-                    }
-                }
-            }
-        }
+        var comma = args.indexOf(',');
+        var className= comma == -1 ? args : args.substring(0, comma);
+        var remainingArgs = comma == -1 ? "" : args.substring(comma + 1);
 
-        instr.addTransformer(new JvmInsightAgent(insight, classes, methods, handler));
+        var insightMainClass = Class.forName(className);
+        var insightMainMethod = insightMainClass.getMethod("insightmain", String.class, JvmInsight.class);
+        insightMainMethod.invoke(null, remainingArgs, agent.insight);
+
+        instr.addTransformer(agent);
     }
 
-    private JvmInsightAgent(
-        JvmInsight insight,
-        Pattern pattern, Pattern methods,
-        BiConsumer<String, Map<String, Object>> handler
-    ) {
-        if (pattern == null) {
-            throw new IllegalArgumentException("Specify classses=.*MyClass.* filter");
-        }
-        if (handler == null) {
-            throw new IllegalArgumentException("Specify handler=my.pkg.MyHandler");
-        }
-        this.global = insight;
+    private JvmInsightAgent(Instrumentation instr) {
+        this.instr = instr;
         this.clazzFile = ClassFile.of();
-        this.pattern = pattern;
-        this.methods = methods;
-        this.handler = handler;
+        this.insight = JvmInsight.enableInstrumentation(this);
     }
 
     @Override
@@ -127,32 +73,20 @@ final class JvmInsightAgent implements ClassFileTransformer {
         String className, Class<?> classBeingRedefined,
         ProtectionDomain protectionDomain, byte[] classfileBuffer
     ) throws IllegalClassFormatException {
-        if (pattern.matcher(className).matches()) {
-            try {
-                log("Transforming " + className);
-                var model = clazzFile.parse(classfileBuffer);
-                var newByteCode = clazzFile.transformClass(model, new JvmInsightTransform(model));
-                configure(className);
-                return newByteCode;
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
+        if (
+            loader == ClassLoader.getSystemClassLoader() &&
+            !className.startsWith("org/apidesign/graalvm/insight/JvmInsight")
+        ) {
+            log("Transforming " + className);
+            var model = clazzFile.parse(classfileBuffer);
+            var newByteCode = clazzFile.transformClass(model, new JvmInsightTransform(model));
+            return newByteCode;
+        } else {
+            return null;
         }
-        return null;
     }
 
     private static void log(String msg) {
         System.err.println("[JvmInsightAgent]: " + msg);
-    }
-
-
-    private void configure(String className) {
-        var handle = global.configure((insight) -> {
-                insight.apply(null).roots().call((methodName, localVars) -> {
-                    if (methods == null || methods.matcher(methodName).matches()) {
-                        handler.accept(methodName, localVars);
-                    }
-                });
-        });
     }
 }

@@ -12,8 +12,8 @@
  * limitations under the License.
  */
 
-// $ javac Hello.java PrintingCallback.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Hello,methods=.*hi.*,handler=e2e.PrintingCallback Hello
+// $ javac -cp ${jvminsight} Hello.java PrintingCallback.java -g -d ${classes}
+// $ java -cp ${classes} -javaagent:${jvminsight}=e2e.PrintingCallback,classes=.*Hello,methods=.*hi.* Hello
 // > Hi World!
 // 2> [JvmInsightAgent]: Transforming Hello
 // 2> enter Hello.main

@@ -12,8 +12,8 @@
  * limitations under the License.
  */
 
-// $ javac Fib.java PrintingCallback.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight}=classes=.*Fib.*,methods=.*fib.*,handler=e2e.PrintingCallback Fib
+// $ javac -cp ${jvminsight} Fib.java PrintingCallback.java -g -d ${classes}
+// $ java -cp ${classes} -javaagent:${jvminsight}=e2e.PrintingCallback,classes=.*Fib.*,methods=.*fib.* Fib
 // > fib(5) = 8
 // 2> [JvmInsightAgent]: Transforming Fib
 // 2> [Callback]: Method -1:LFib;.fib(I)I with local variables: {n=5}
