@@ -38,15 +38,15 @@ import java.util.regex.Pattern;
  *
  */
 public final class JvmInsight  {
-    private static final JvmInsight DEFAULT = new JvmInsight();
-    private Object instr;
+    /** Default JVM Insight to be used for the whole JVM.
+     */
+    private static final JvmInsight DEFAULT = new JvmInsight(
+        JvmInsightInitializer.getInstrumentation()
+    );
+    private final Object instr;
 
-    private JvmInsight() {
-    }
-
-    static JvmInsight enableInstrumentation(Object instr) {
-        DEFAULT.instr = instr;
-        return DEFAULT;
+    JvmInsight(Object instr) {
+        this.instr = instr;
     }
 
     /**
@@ -94,9 +94,7 @@ public final class JvmInsight  {
      * @return the JVM Insights ready classloader
      */
     public static ClassLoader createLoader(ClassLoader parent, URL... cp) {
-        var insight = new JvmInsight();
-        var loader = new JvmInsightLoader(insight, parent, cp);
-        insight.instr = loader;
+        var loader = new JvmInsightLoader(parent, cp);
         return loader;
     }
 

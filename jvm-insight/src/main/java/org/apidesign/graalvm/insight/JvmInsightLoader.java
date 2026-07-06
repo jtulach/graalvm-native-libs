@@ -26,9 +26,9 @@ final class JvmInsightLoader extends URLClassLoader {
     private final JvmInsight jvmInsight;
     private final ClassFile clazzFile;
 
-    JvmInsightLoader(JvmInsight jvmInsight, ClassLoader l, URL... u) {
+    JvmInsightLoader(ClassLoader l, URL... u) {
         super(u, l);
-        this.jvmInsight = jvmInsight;
+        this.jvmInsight = new JvmInsight(this);
         this.clazzFile = ClassFile.of();
     }
 

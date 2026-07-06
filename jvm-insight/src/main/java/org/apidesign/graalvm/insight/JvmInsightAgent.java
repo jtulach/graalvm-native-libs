@@ -48,6 +48,8 @@ final class JvmInsightAgent implements ClassFileTransformer {
     }
 
     private static void registerAgent(String args, Instrumentation instr) throws Exception {
+        JvmInsightInitializer.withInstrumentation(instr);
+
         var agent = new JvmInsightAgent(instr);
 
         var comma = args.indexOf(',');
@@ -64,7 +66,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
     private JvmInsightAgent(Instrumentation instr) {
         this.instr = instr;
         this.clazzFile = ClassFile.of();
-        this.insight = JvmInsight.enableInstrumentation(this);
+        this.insight = JvmInsight.find(null);
     }
 
     @Override
