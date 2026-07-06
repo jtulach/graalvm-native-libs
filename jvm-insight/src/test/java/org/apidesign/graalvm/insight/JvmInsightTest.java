@@ -20,41 +20,44 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * Simple bytecode patching tests. Sometimes it is not easy to debug
  * {@link JvmInsightEspressoTest} as the bytecode being processed there
- * is <em>too complicated<em>. In such case it is recommended to create
+ * is <em>too complicated</em>. In such case it is recommended to create
  * a {@code simpleXyz} test in {@link Factorial} class demonstrating the
  * problem and test it from this class. E.g. without involving Espresso
  * at all.
  */
 public class JvmInsightTest {
+    private ClassLoader loader;
+
     /** This is the {@link Factorial} class loaded by different classloader.
      * That classloader patches the bytecode of the loaded classes to be
      * {@link JvmInsight} capable. As the class is loaded by different classloader
      * that this testing class, we have to access it via reflection.
      */
-    private static Class<?> FactorialHosted;
+    private Class<?> loadFactorialClass() throws ClassNotFoundException {
+        var clazz = loader.loadClass(Factorial.class.getName());
+        assertNotEquals(Factorial.class, clazz, "Factorial shall be masked from this loader");
+        assertNotNull(clazz, "Factorial class is loaded");
+        return clazz;
+    }
 
-    @BeforeAll
-    public static void initializeContext() throws Exception {
+    @BeforeEach
+    public void initializeContext() throws Exception {
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
         var bothCp = new URL[] {
             JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
             cp
         };
-        var loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
-        FactorialHosted = loader.loadClass(Factorial.class.getName());
-        assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
-        assertNotNull(FactorialHosted, "Factorial class is loaded");
+        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
     }
 
     @Test
     public void testFactorialMethodInvocation() throws Exception {
-        var methodFac = FactorialHosted.getMethod("fac", int.class);
         var sum = new int[1];
         var counter = (BiConsumer<String, Map<String, Object>>) (methodName, frame) -> {
             if (!methodName.contains("fac")) {
@@ -66,13 +69,14 @@ public class JvmInsightTest {
             sum[0] += n.intValue();
         };
 
-        var jvmInsight = JvmInsight.find(FactorialHosted.getClassLoader());
+        var jvmInsight = JvmInsight.find(loader);
         jvmInsight.configure((_) -> true, (insight) -> {
-            insight.apply(FactorialHosted)
+            insight
                 .roots()
                 .call(counter);
         });
 
+        var methodFac = loadFactorialClass().getMethod("fac", int.class);
         var res = (Number) methodFac.invoke(null, 5);
         assertEquals(120, res.intValue(), "Factorial is computed");
         assertEquals(15, sum[0], "Sum is being added to");
@@ -80,35 +84,35 @@ public class JvmInsightTest {
 
     @Test
     public void testSimpleLocalValueReturn() throws Exception {
-        var method = FactorialHosted.getMethod("simpleReturn", int.class);
+        var method = loadFactorialClass().getMethod("simpleReturn", int.class);
         var res = method.invoke(null, 42);
         assertEquals(42, res);
     }
 
     @Test
     public void testSimpleLocalValueAssign() throws Exception {
-        var method = FactorialHosted.getMethod("simpleAssign", int.class);
+        var method = loadFactorialClass().getMethod("simpleAssign", int.class);
         var res = method.invoke(null, 6);
         assertEquals(36, res);
     }
 
     @Test
     public void testSimpleLoopFac() throws Exception {
-        var method = FactorialHosted.getMethod("simpleFac", int.class);
+        var method = loadFactorialClass().getMethod("simpleFac", int.class);
         var res = method.invoke(null, 6);
         assertEquals(720, res);
     }
 
     @Test
     public void testSimpleShortFac() throws Exception {
-        var method = FactorialHosted.getMethod("simpleShortFac", byte.class);
+        var method = loadFactorialClass().getMethod("simpleShortFac", byte.class);
         var res = method.invoke(null, (byte)4);
         assertEquals((short)24, res);
     }
 
     @Test
     public void testSimpleConcat() throws Exception {
-        var method = FactorialHosted.getMethod("simpleConcat", String.class, String.class);
+        var method = loadFactorialClass().getMethod("simpleConcat", String.class, String.class);
         var res = method.invoke(null, "Hello ", "World!");
         assertEquals("Hello World!", res);
     }

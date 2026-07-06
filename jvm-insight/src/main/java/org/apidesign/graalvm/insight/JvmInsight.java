@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -45,6 +46,7 @@ public final class JvmInsight  {
         JvmInsightInitializer.getInstrumentation()
     );
     private final Object instr;
+    private final List<Registry> registrations = new CopyOnWriteArrayList<>();
 
     JvmInsight(Object instr) {
         this.instr = instr;
@@ -79,19 +81,11 @@ public final class JvmInsight  {
      *   these insights are to be disabled
      */
     public AutoCloseable configure(
-        Predicate<CharSequence> classFilter,
-        Consumer<Function<Class<?>, Builder>> block
+        Predicate<? super ClassInfo> classFilter,
+        Consumer<? super Builder> block
     ) {
-        if (this == DEFAULT && this.instr == null) {
-            // no op
-            return () -> {};
-        }
-
-        var registrar = new Registry();
-
-        block.accept((clazz) -> {
-            return new Builder(registrar, clazz);
-        });
+        var registrar = new Registry(classFilter, block);
+        registrations.add(registrar);
         return registrar;
     }
 
@@ -107,6 +101,85 @@ public final class JvmInsight  {
     public static ClassLoader createLoader(ClassLoader parent, URL... cp) {
         var loader = new JvmInsightLoader(parent, cp);
         return loader;
+    }
+
+    /** Info about class to be loaded. In addition to providing various
+     * info about the class to be loaded, it also implements a {@like CharSequence}
+     * representing the same content of {@link #name()}, so filters
+     * can work with generic type when just a name is enough to filter.
+     */
+    public final class ClassInfo implements CharSequence {
+        private final String name;
+        private final Module module;
+        private final ClassLoader loader;
+
+        ClassInfo(String name, Module module, ClassLoader loader) {
+            this.name = name;
+            this.module = module;
+            this.loader = loader;
+        }
+
+        /** Fully qualified, cannonical name of the class. E.g. {@code java.lang.String}.
+         *
+         * @return name in the same format as {@link Class#getName()}
+         */
+        public final String name() {
+            return name;
+        }
+
+        /** Fully qualified name with slashes. E.g. {@code java/lang/String}.
+         *
+         * @return name in the JVM ready format
+         */
+        public final String jvmName() {
+            return name.replace('.', '/');
+        }
+
+        /** The classloader loading this class.
+         *
+         * @return the classloader
+         */
+        public ClassLoader loader() {
+            return loader;
+        }
+
+        /** @return {@code name().length()} */
+        @Override
+        public int length() {
+            return name.length();
+        }
+
+        /** @return {@code name().charAt(index)} */
+        @Override
+        public char charAt(int index) {
+            return name.charAt(index);
+        }
+
+        /** @return {@code name().subSequence(start, end)} */
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return name.subSequence(start, end);
+        }
+
+        /** Check whether a class to be loaded shall be patched.
+         *
+         * @return true if this class should be instrumented at least by
+         *   one of registered insights
+         */
+        final boolean instrumentClass() {
+            if (name.startsWith("org.apidesign.graalvm.insight.JvmInsight")) {
+                // avoid self recursion
+                return false;
+            }
+            var instrument = false;
+            for (var r : registrations) {
+                if (r.acceptAndEnable(this)) {
+                    instrument = true;
+                }
+            }
+            return instrument;
+        }
+
     }
 
     /** Type of JVM Insight event. */
@@ -314,10 +387,14 @@ public final class JvmInsight  {
         return data.statements(at);
     }
 
-    private static class Registry implements AutoCloseable {
+    private class Registry implements AutoCloseable {
+        private final Predicate<? super ClassInfo> filter;
         private final Map<Class<?>, List<JvmInsightClassData.Convertor>> entries = new LinkedHashMap<>();
+        private volatile Consumer<? super Builder> init;
 
-        Registry() {
+        private Registry(Predicate<? super ClassInfo> classFilter, Consumer<? super Builder> block) {
+            this.filter = classFilter;
+            this.init = block;
         }
 
         @Override
@@ -340,6 +417,21 @@ public final class JvmInsight  {
                 entries.put(bldr.clazz, list);
             }
             list.add(reg);
+        }
+
+        private boolean acceptAndEnable(ClassInfo info) {
+            var accept = filter.test(info);
+            if (accept && init != null) {
+                Consumer<? super Builder> toInit;
+                synchronized (this) {
+                    toInit = init;
+                    init = null;
+                }
+                if (toInit != null) {
+                    toInit.accept(new Builder(this, null));
+                }
+            }
+            return accept;
         }
     }
 }

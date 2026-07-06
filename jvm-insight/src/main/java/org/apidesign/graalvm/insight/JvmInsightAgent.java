@@ -75,10 +75,8 @@ final class JvmInsightAgent implements ClassFileTransformer {
         String className, Class<?> classBeingRedefined,
         ProtectionDomain protectionDomain, byte[] classfileBuffer
     ) throws IllegalClassFormatException {
-        if (
-            loader == ClassLoader.getSystemClassLoader() &&
-            !className.startsWith("org/apidesign/graalvm/insight/JvmInsight")
-        ) {
+        var info = insight.new ClassInfo(className, module, loader);
+        if (info.instrumentClass()) {
             log("Transforming " + className);
             var model = clazzFile.parse(classfileBuffer);
             var newByteCode = clazzFile.transformClass(model, new JvmInsightTransform(model));

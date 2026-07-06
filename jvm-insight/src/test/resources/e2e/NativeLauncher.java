@@ -19,7 +19,7 @@ import java.util.Arrays;
 import org.apidesign.graalvm.insight.JvmInsight;
 
 // $ javac -cp ${jvminsight} NativeLauncher.java -g -d ${classes}
-// $ native-image -cp ${jvminsight}:${classes} \
+// $ native-image -Ob -cp ${jvminsight}:${classes} \
 //    -H:+RuntimeClassLoading -H:+AllowJRTFileSystem \
 //    -H:Preserve=package=java.lang \
 //    -H:Preserve=package=jdk.internal.misc \
@@ -55,20 +55,20 @@ public final class NativeLauncher {
         var loader = JvmInsight.createLoader(JvmInsight.class.getClassLoader(), cp);
         var jvmInsight = JvmInsight.find(loader);
 
-        var clazz = loader.loadClass(args[1]);
-        var method = clazz.getMethod("main", String[].class);
-        method.setAccessible(true);
-
-        var remaining = Arrays.copyOfRange(args, 2, args.length);
-        try (var handle = jvmInsight.configure((n) -> {
-            return n.toString().replace('.', '/').equals(args[1]);
-        }, insight -> {
-            insight.apply(clazz).roots().call((name, localVars) -> {
+        try (var _ = jvmInsight.configure((n) -> {
+            return n.name().replace('.', '/').equals(args[1]);
+        }, bldr -> {
+            bldr.roots().call((name, localVars) -> {
                 if (localVars.containsKey("n")) {
                     System.err.println("[Crema+JvmInsight]: method " + name + " with: " + localVars);
                 }
             });
         })) {
+            var clazz = loader.loadClass(args[1]);
+            var method = clazz.getMethod("main", String[].class);
+            method.setAccessible(true);
+
+            var remaining = Arrays.copyOfRange(args, 2, args.length);
             method.invoke(null, (Object) remaining);
         }
     }

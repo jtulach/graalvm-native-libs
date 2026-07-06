@@ -56,12 +56,11 @@ public final class JvmInsightEspressoTest {
      * do to make the class GraalVM Insight capable.
      */
     private static Value Factorial;
-    /** This is the {@link Factorial} class loaded by different classloader.
+    /** The {@link Factorial} class must be loaded by different classloader.
      * That classloader patches the bytecode of the loaded classes to be
-     * {@link JvmInsight} capable. As the class is loaded by different classloader
-     * that this testing class, we have to access it via reflection.
+     * {@link JvmInsight} capable.
      */
-    private static Class<?> FactorialHosted;
+    private static ClassLoader loader;
 
     public JvmInsightEspressoTest() {
     }
@@ -70,10 +69,6 @@ public final class JvmInsightEspressoTest {
     public static void initializeContext() throws Exception {
         out = new ByteArrayOutputStream();
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
-        var bothCp = new URL[] {
-            JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
-            cp
-        };
         var hostAccess = HostAccess.newBuilder()
                 .allowAccessAnnotatedBy(HostAccess.Export.class)
                 .allowImplementationsAnnotatedBy(FunctionalInterface.class)
@@ -88,11 +83,28 @@ public final class JvmInsightEspressoTest {
         ctx.enter();
         Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
         assertNotNull(Factorial, "Class is found");
+    }
 
-        var loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
-        FactorialHosted = loader.loadClass(Factorial.class.getName());
+    @BeforeEach
+    public void initializeLoader() throws Exception {
+        var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
+        var bothCp = new URL[] {
+            JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
+            cp
+        };
+        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
+    }
+
+    /** This is the {@link Factorial} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
+    private static Class<?> FactorialHosted() throws ClassNotFoundException {
+        var FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");
+        return FactorialHosted;
     }
 
     @AfterAll
@@ -117,8 +129,6 @@ public final class JvmInsightEspressoTest {
                 rootNameFilter : '.*fac.*'
             });
             """;
-        var warmUp = jvm.invokeFactorialMethodLong("fac", 6);
-        assertEquals(720, warmUp);
         try (
             var _ = jvm.applyInsight(ctx, insight, "print-n.js")
         ) {
@@ -146,8 +156,6 @@ public final class JvmInsightEspressoTest {
                 rootNameFilter : '.*simpleFac.*'
             });
             """;
-        var warmUp = jvm.invokeFactorialMethodLong("simpleFac", 6);
-        assertEquals(720, warmUp);
         try (
             var _ = jvm.applyInsight(ctx, insight, "print-sum.js")
         ) {
@@ -453,9 +461,8 @@ public final class JvmInsightEspressoTest {
                         fn.apply(ctx, needsTxtFrame ? txtFrame : frame);
                     }
                 };
-                var jvmInsight = JvmInsight.find(FactorialHosted.getClassLoader());
-                handle = jvmInsight.configure((_) -> true, (insight) -> {
-                    var bldr = insight.apply(FactorialHosted);
+                var jvmInsight = JvmInsight.find(loader);
+                handle = jvmInsight.configure((_) -> true, (bldr) -> {
                     switch (type) {
                         case "enter" -> bldr.when(JvmInsight.When.ENTER);
                         case "return" -> bldr.when(JvmInsight.When.RETURN);
@@ -508,7 +515,7 @@ public final class JvmInsightEspressoTest {
                 case ESPRESSO -> Factorial.invokeMember(name, args).asLong();
                 case JVM -> {
                     try {
-                        for (var m : FactorialHosted.getMethods()) {
+                        for (var m : FactorialHosted().getMethods()) {
                             if (!m.getName().equals(name)) {
                                 continue;
                             }
@@ -532,7 +539,7 @@ public final class JvmInsightEspressoTest {
                 case ESPRESSO -> Factorial.invokeMember(name, args).asString();
                 case JVM -> {
                     try {
-                        for (var m : FactorialHosted.getMethods()) {
+                        for (var m : FactorialHosted().getMethods()) {
                             if (!m.getName().equals(name)) {
                                 continue;
                             }
@@ -555,8 +562,8 @@ public final class JvmInsightEspressoTest {
                 }
                 case JVM -> {
                     try {
-                        var inst = FactorialHosted.getConstructor().newInstance();
-                        for (var m : FactorialHosted.getMethods()) {
+                        var inst = FactorialHosted().getConstructor().newInstance();
+                        for (var m : FactorialHosted().getMethods()) {
                             if (!m.getName().equals(name)) {
                                 continue;
                             }
