@@ -457,8 +457,8 @@ public final class JvmInsightEspressoTest {
                 handle = jvmInsight.configure((insight) -> {
                     var bldr = insight.apply(FactorialHosted);
                     switch (type) {
-                        case "enter" -> bldr.when(JvmInsight.Builder.When.ENTER);
-                        case "return" -> bldr.when(JvmInsight.Builder.When.RETURN);
+                        case "enter" -> bldr.when(JvmInsight.When.ENTER);
+                        case "return" -> bldr.when(JvmInsight.When.RETURN);
                         default -> throw new IllegalStateException(type);
                     }
                     if (Boolean.TRUE.equals(cfg.get("roots"))) {

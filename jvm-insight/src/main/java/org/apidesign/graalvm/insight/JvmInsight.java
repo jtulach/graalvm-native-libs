@@ -100,6 +100,114 @@ public final class JvmInsight  {
         return loader;
     }
 
+    /** Type of JVM Insight event. */
+    public enum When {
+        ENTER, RETURN;
+    }
+
+    /** Identifies a location of JVM Insight event. It carries individual
+     * informations about {@link #line()}, {@link
+     */
+    public static final class At {
+        private final When when;
+        private final Class<?> clazz;
+        private final String methodName;
+        private final String methodDescriptor;
+        private final int line;
+        private final String fqn;
+
+        private At(
+            When when, Class<?> clazz, String methodName, String methodDescriptor, int line
+        ) {
+            this.when = when;
+            this.clazz = clazz;
+            this.methodName = methodName;
+            this.methodDescriptor = methodDescriptor;
+            this.line = line;
+
+            this.fqn = line + ":L"
+                + clazz.getName().replace('.', '/')
+                + ";." + methodName
+                + methodDescriptor;
+        }
+
+        public When when() {
+            return when;
+        }
+
+        public Class<?> where() {
+            return clazz;
+        }
+
+        public String descriptor() {
+            return methodDescriptor;
+        }
+
+        public String name() {
+            return methodName;
+        }
+
+        public int line() {
+            return line;
+        }
+
+        /**
+         * Returns so called <em>fully qualified name</em> of the {@code At}
+         * location. The format is {@code line:type.method} where:
+         * <ul>
+         *   <li>line is a number returned by {@link #line()}</li>
+         *   <li>type is a JVM name of the {@link #where()} type - something like {@code Ljava/lang/String;}</li>
+         *   <li>method is {@link #name()} followed by the {@link #descriptor()}</li>
+         * </ul>
+         *
+         * @return
+         */
+        @Override
+        public String toString() {
+            return fqn;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 59 * hash + Objects.hashCode(this.when);
+            hash = 59 * hash + Objects.hashCode(this.clazz);
+            hash = 59 * hash + Objects.hashCode(this.methodName);
+            hash = 59 * hash + Objects.hashCode(this.methodDescriptor);
+            hash = 59 * hash + this.line;
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final At other = (At) obj;
+            if (this.line != other.line) {
+                return false;
+            }
+            if (!Objects.equals(this.methodName, other.methodName)) {
+                return false;
+            }
+            if (!Objects.equals(this.methodDescriptor, other.methodDescriptor)) {
+                return false;
+            }
+            if (this.when != other.when) {
+                return false;
+            }
+            return Objects.equals(this.clazz, other.clazz);
+        }
+
+
+    }
+
     /** Configuration for an Insight callback.
      * Use methods of this class to configure a callback and then register
      * it by calling {@link Builder#call}.
@@ -115,10 +223,6 @@ public final class JvmInsight  {
         private Builder(Registry registry, Class<?> clazz) {
             this.registry = registry;
             this.clazz = clazz;
-        }
-
-        public enum When {
-            ENTER, RETURN;
         }
 
         public Builder when(When type) {
@@ -176,34 +280,29 @@ public final class JvmInsight  {
                 JvmInsight.class, name,
                 MethodType.methodType(
                     Consumer.class,
-                    Builder.When.class,
-                    Class.class,
-                    String.class
+                    At.class
                 )
             );
-            var handle = switch (when) {
-                case "enter" -> rawHandle.bindTo(Builder.When.ENTER);
-                case "return" -> rawHandle.bindTo(Builder.When.RETURN);
-                default -> throw new IllegalArgumentException(when);
-            };
-            var fqn = line + ":L"
-                + clazz.getName().replace('.', '/')
-                + ";." + methodName
-                + methodDescriptor;
-
-            var consumer = handle.bindTo(clazz).bindTo(fqn);
+            var at = new At(
+                When.valueOf(when.toUpperCase()),
+                clazz, methodName, methodDescriptor, line
+            );
+            var consumer = rawHandle
+                .bindTo(at);
             return new ConstantCallSite(consumer);
         } catch (NoSuchMethodException | IllegalAccessException ex) {
             throw new IllegalArgumentException(ex);
         }
     }
 
-    private static Consumer<Map<String, Object>> roots(Builder.When when, Class<?> clazz, String fqn) {
-        return JvmInsightClassData.find(clazz).roots(when, fqn);
+    private static Consumer<Map<String, Object>> roots(At at) {
+        var data = JvmInsightClassData.find(at.where());
+        return data.roots(at);
     }
 
-    private static Consumer<Map<String, Object>> statements(Builder.When when, Class<?> clazz, String fqn) {
-        return JvmInsightClassData.find(clazz).statements(when, fqn);
+    private static Consumer<Map<String, Object>> statements(At at) {
+        var data = JvmInsightClassData.find(at.where());
+        return data.statements(at);
     }
 
     private static class Registry implements AutoCloseable {

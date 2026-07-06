@@ -25,8 +25,8 @@ import java.util.regex.Pattern;
 final class JvmInsightClassData {
     private static final Provider PROVIDER = new Provider();
     private static final JvmInsightClassData GLOBAL = new JvmInsightClassData(null);
-    private final Map<JvmInsight.Builder.When, List<Convertor>> roots = new EnumMap<>(JvmInsight.Builder.When.class);
-    private final Map<JvmInsight.Builder.When, List<Convertor>> statements = new EnumMap<>(JvmInsight.Builder.When.class);
+    private final Map<JvmInsight.When, List<Convertor>> roots = new EnumMap<>(JvmInsight.When.class);
+    private final Map<JvmInsight.When, List<Convertor>> statements = new EnumMap<>(JvmInsight.When.class);
 
     private JvmInsightClassData(Class<?> type) {
     }
@@ -39,12 +39,16 @@ final class JvmInsightClassData {
         }
     }
 
-    final Consumer<Map<String, Object>> roots(JvmInsight.Builder.When when, String fqn) {
-        return dispatcher(roots.get(when), GLOBAL.roots.get(when), fqn);
+    final Consumer<Map<String, Object>> roots(JvmInsight.At at) {
+        var local = roots.get(at.when());
+        var global = GLOBAL.roots.get(at.when());
+        return dispatcher(local, global, at.toString());
     }
 
-    final Consumer<Map<String, Object>> statements(JvmInsight.Builder.When when, String fqn) {
-        return dispatcher(statements.get(when), GLOBAL.statements.get(when), fqn);
+    final Consumer<Map<String, Object>> statements(JvmInsight.At at) {
+        var local = statements.get(at.when());
+        var global = GLOBAL.statements.get(at.when());
+        return dispatcher(local, global, at.toString());
     }
 
     private static Consumer<Map<String, Object>> dispatcher(List<Convertor> list1, List<Convertor> list2, String fqn) {
@@ -64,7 +68,7 @@ final class JvmInsightClassData {
 
     synchronized Convertor register(
         boolean roots, boolean statements,
-        JvmInsight.Builder.When when, Pattern methodFilter,
+        JvmInsight.When when, Pattern methodFilter,
         BiConsumer<String, Map<String, Object>> handler
     ) {
         var c = new Convertor(roots, statements, when, handler);
@@ -108,10 +112,13 @@ final class JvmInsightClassData {
     static class Convertor implements BiConsumer<String, Map<String, Object>> {
         private final boolean roots;
         private final boolean statements;
-        private final JvmInsight.Builder.When when;
+        private final JvmInsight.When when;
         private final BiConsumer<String, Map<String, Object>> handler;
 
-        private Convertor(boolean roots, boolean statements, JvmInsight.Builder.When when, BiConsumer<String, Map<String, Object>> handler) {
+        private Convertor(
+            boolean roots, boolean statements,
+            JvmInsight.When when, BiConsumer<String, Map<String, Object>> handler
+        ) {
             this.handler = handler;
             this.roots = roots;
             this.when = when;
