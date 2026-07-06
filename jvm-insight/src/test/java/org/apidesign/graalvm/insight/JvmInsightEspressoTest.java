@@ -454,7 +454,7 @@ public final class JvmInsightEspressoTest {
                     }
                 };
                 var jvmInsight = JvmInsight.find(FactorialHosted.getClassLoader());
-                handle = jvmInsight.configure((insight) -> {
+                handle = jvmInsight.configure((_) -> true, (insight) -> {
                     var bldr = insight.apply(FactorialHosted);
                     switch (type) {
                         case "enter" -> bldr.when(JvmInsight.When.ENTER);

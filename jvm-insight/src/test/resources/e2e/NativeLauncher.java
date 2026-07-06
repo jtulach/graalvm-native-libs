@@ -60,7 +60,9 @@ public final class NativeLauncher {
         method.setAccessible(true);
 
         var remaining = Arrays.copyOfRange(args, 2, args.length);
-        try (var handle = jvmInsight.configure((insight) -> {
+        try (var handle = jvmInsight.configure((n) -> {
+            return n.toString().replace('.', '/').equals(args[1]);
+        }, insight -> {
             insight.apply(clazz).roots().call((name, localVars) -> {
                 if (localVars.containsKey("n")) {
                     System.err.println("[Crema+JvmInsight]: method " + name + " with: " + localVars);

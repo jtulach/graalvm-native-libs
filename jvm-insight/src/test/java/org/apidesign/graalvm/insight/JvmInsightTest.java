@@ -67,7 +67,7 @@ public class JvmInsightTest {
         };
 
         var jvmInsight = JvmInsight.find(FactorialHosted.getClassLoader());
-        jvmInsight.configure((insight) -> {
+        jvmInsight.configure((_) -> true, (insight) -> {
             insight.apply(FactorialHosted)
                 .roots()
                 .call(counter);

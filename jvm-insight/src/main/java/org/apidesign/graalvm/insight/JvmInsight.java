@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /** {@link JvmInsight} allows advanced instrumentation to be applied to
@@ -65,12 +66,22 @@ public final class JvmInsight  {
     /**
      * Applies new Insights to the running JVM.
      *
+     * @param classFilter identifies which classes to instrument with the
+     *   JVM Insight capabilities. The argument for the function is the
+     *   fully qualified JVM name of the class -
+     *   e.g. {@code java/lang/String}, etc.
+     *
      * @param block block that receives an instance of {@link JvmInsight.Builder}
-     *   factory and can use it to configure its JVM Insights
+     *   factory and can use it to configure its JVM Insights. The block
+     *   is invoked once, at the first moment an eligible class is found
+     *
      * @return a handle that can be {@link AutoCloseable#close()} when
      *   these insights are to be disabled
      */
-    public AutoCloseable configure(Consumer<Function<Class<?>, Builder>> block) {
+    public AutoCloseable configure(
+        Predicate<CharSequence> classFilter,
+        Consumer<Function<Class<?>, Builder>> block
+    ) {
         if (this == DEFAULT && this.instr == null) {
             // no op
             return () -> {};
