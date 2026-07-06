@@ -442,7 +442,8 @@ public final class JvmInsightEspressoTest {
             throws Exception {
                 var filter = (String) cfg.get("rootNameFilter");
                 var rootNameFilter = filter == null ? null : Pattern.compile(filter);
-                final BiConsumer<String, Map<String, Object>> handler = (String where, Map<String,Object> frame) -> {
+                final BiConsumer<JvmInsight.At, Map<String, Object>> handler = (var at, var frame) -> {
+                    var where = at.toString();
                     var lineSep = where.indexOf(':');
                     var line = Integer.parseInt(where.substring(0, lineSep));
                     var methodName = where.substring(lineSep + 1);

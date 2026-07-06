@@ -21,6 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import org.apidesign.graalvm.insight.JvmInsight.At;
 
 final class JvmInsightClassData {
     private static final Provider PROVIDER = new Provider();
@@ -42,16 +43,16 @@ final class JvmInsightClassData {
     final Consumer<Map<String, Object>> roots(JvmInsight.At at) {
         var local = roots.get(at.when());
         var global = GLOBAL.roots.get(at.when());
-        return dispatcher(local, global, at.toString());
+        return dispatcher(local, global, at);
     }
 
     final Consumer<Map<String, Object>> statements(JvmInsight.At at) {
         var local = statements.get(at.when());
         var global = GLOBAL.statements.get(at.when());
-        return dispatcher(local, global, at.toString());
+        return dispatcher(local, global, at);
     }
 
-    private static Consumer<Map<String, Object>> dispatcher(List<Convertor> list1, List<Convertor> list2, String fqn) {
+    private static Consumer<Map<String, Object>> dispatcher(List<Convertor> list1, List<Convertor> list2, JvmInsight.At fqn) {
         if (list1 == null && list2 == null) {
             return null;
         } else {
@@ -69,7 +70,7 @@ final class JvmInsightClassData {
     synchronized Convertor register(
         boolean roots, boolean statements,
         JvmInsight.When when, Pattern methodFilter,
-        BiConsumer<String, Map<String, Object>> handler
+        BiConsumer<? super At, Map<String, Object>> handler
     ) {
         var c = new Convertor(roots, statements, when, handler);
         if (roots) {
@@ -109,15 +110,15 @@ final class JvmInsightClassData {
         }
     }
 
-    static class Convertor implements BiConsumer<String, Map<String, Object>> {
+    static class Convertor implements BiConsumer<At, Map<String, Object>> {
         private final boolean roots;
         private final boolean statements;
         private final JvmInsight.When when;
-        private final BiConsumer<String, Map<String, Object>> handler;
+        private final BiConsumer<? super At, Map<String, Object>> handler;
 
         private Convertor(
             boolean roots, boolean statements,
-            JvmInsight.When when, BiConsumer<String, Map<String, Object>> handler
+            JvmInsight.When when, BiConsumer<? super At, Map<String, Object>> handler
         ) {
             this.handler = handler;
             this.roots = roots;
@@ -126,7 +127,7 @@ final class JvmInsightClassData {
         }
 
         @Override
-        public void accept(String t, Map<String, Object> data) {
+        public void accept(At t, Map<String, Object> data) {
             var names = (String[]) data.get("names");
             var values = (Object[]) data.get("values");
             var frame = new HashMap<String, Object>();

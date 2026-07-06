@@ -59,7 +59,8 @@ public class JvmInsightTest {
     @Test
     public void testFactorialMethodInvocation() throws Exception {
         var sum = new int[1];
-        var counter = (BiConsumer<String, Map<String, Object>>) (methodName, frame) -> {
+        var counter = (BiConsumer<CharSequence, Map<String, Object>>) (at, frame) -> {
+            var methodName = at.toString();
             if (!methodName.contains("fac")) {
                 return;
             }

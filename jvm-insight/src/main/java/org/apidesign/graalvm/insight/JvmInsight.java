@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -190,7 +189,7 @@ public final class JvmInsight  {
     /** Identifies a location of JVM Insight event. It carries individual
      * informations about {@link #line()}, {@link
      */
-    public static final class At {
+    public static final class At implements CharSequence {
         private final When when;
         private final Class<?> clazz;
         private final String methodName;
@@ -247,6 +246,21 @@ public final class JvmInsight  {
         @Override
         public String toString() {
             return fqn;
+        }
+
+        @Override
+        public int length() {
+            return fqn.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return fqn.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return fqn.subSequence(start, end);
         }
 
         @Override
@@ -328,7 +342,7 @@ public final class JvmInsight  {
             return this;
         }
 
-        public void call(BiConsumer<String, Map<String, Object>> handler) {
+        public void call(BiConsumer<? super At, Map<String, Object>> handler) {
             registry.register(this, handler);
         }
     }
@@ -408,7 +422,7 @@ public final class JvmInsight  {
             entries.clear();
         }
 
-        private synchronized void register(Builder bldr, BiConsumer<String, Map<String, Object>> handler) {
+        private synchronized void register(Builder bldr, BiConsumer<? super At, Map<String, Object>> handler) {
             var data = JvmInsightClassData.find(bldr.clazz);
             var reg = data.register(bldr.roots, bldr.statements, bldr.when, bldr.methodFilter, handler);
             var list = entries.get(bldr.clazz);

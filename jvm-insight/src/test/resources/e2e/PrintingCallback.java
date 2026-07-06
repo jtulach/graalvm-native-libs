@@ -21,7 +21,7 @@ import org.apidesign.graalvm.insight.JvmInsight;
 /* This is not a class to execute. Thus just: */
 // $ exit
 
-public final class PrintingCallback implements BiConsumer<String, Map<String, Object>> {
+public final class PrintingCallback implements BiConsumer<CharSequence, Map<String, Object>> {
     /** A JVM Insight script entry point. Any {@code public static} method
      * named {@code insightmain} with two ({@code String} and
      * {@code JvmInsight}) arguments can be an entry point.
@@ -78,7 +78,7 @@ public final class PrintingCallback implements BiConsumer<String, Map<String, Ob
 
 
     @Override
-    public void accept(String methodName, Map<String, Object> localVars) {
+    public void accept(CharSequence methodName, Map<String, Object> localVars) {
         if (methods.matcher(methodName).matches()) {
             var msg = "[Callback]: Method " + methodName + " with local variables: " + localVars;
             System.err.println(msg);
