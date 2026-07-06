@@ -46,9 +46,14 @@ final class JvmInsightTransform implements ClassTransform {
     private final ClassModel model;
     private final ClassDesc callbackClass;
 
-    public JvmInsightTransform(ClassModel clazz) {
+    private JvmInsightTransform(ClassModel clazz) {
         this.model = clazz;
         this.callbackClass = ClassDesc.of("java.util.function.Consumer");
+    }
+
+    static ClassTransform create(ClassModel clazz) {
+        var jvm = new JvmInsightTransform(clazz);
+        return jvm;
     }
 
     @Override

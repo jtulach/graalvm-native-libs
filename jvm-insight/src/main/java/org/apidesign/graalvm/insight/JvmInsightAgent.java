@@ -79,7 +79,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
         if (info.instrumentClass()) {
             log("Transforming " + className);
             var model = clazzFile.parse(classfileBuffer);
-            var newByteCode = clazzFile.transformClass(model, new JvmInsightTransform(model));
+            var newByteCode = clazzFile.transformClass(model, JvmInsightTransform.create(model));
             return newByteCode;
         } else {
             return null;
