@@ -16,6 +16,7 @@ package org.apidesign.graalvm.insight;
 import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
+import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.CodeBuilder;
@@ -33,18 +34,22 @@ import java.lang.classfile.instruction.ReturnInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
+import java.lang.constant.DirectMethodHandleDesc;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Transformer patching byte code to be {@link JvmInsight}-ready.
  */
-final class JvmInsightTransform implements ClassTransform {
+final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder> {
+    private static final String CLASS_INIT_METHOD = "<clinit>";
     private final ClassModel model;
     private final ClassDesc callbackClass;
+    private boolean cinitDone;
 
     private JvmInsightTransform(ClassModel clazz) {
         this.model = clazz;
@@ -53,7 +58,24 @@ final class JvmInsightTransform implements ClassTransform {
 
     static ClassTransform create(ClassModel clazz) {
         var jvm = new JvmInsightTransform(clazz);
-        return jvm;
+        var end = ClassTransform.endHandler(jvm);
+        return jvm.andThen(end);
+    }
+
+    /** Finish rebuilding of the class.
+     *
+     * @param builder code builder to use
+     */
+    @Override
+    public void accept(ClassBuilder builder) {
+        if (!cinitDone) {
+            builder.withMethod(CLASS_INIT_METHOD, MethodTypeDesc.of(ConstantDescs.CD_void), ClassFile.ACC_STATIC, (t) -> {
+                t.withCode((cb) -> {
+                    onClassEnter(cb);
+                    cb.return_();
+                });
+            });
+        }
     }
 
     @Override
@@ -66,6 +88,11 @@ final class JvmInsightTransform implements ClassTransform {
                     && opt.isPresent()
                 ) {
                     mb.withCode(cb -> {
+                        if (method.methodName().equalsString(CLASS_INIT_METHOD)) {
+                            onClassEnter(cb);
+                            cinitDone = true;
+                        }
+
                         var firstLabel = cb.newLabel();
                         var lastLabel = cb.newLabel();
                         Label enterLabel = null;
@@ -254,13 +281,7 @@ final class JvmInsightTransform implements ClassTransform {
     }
 
     private void onHook(String type, String fieldName, MethodModel method, int line, int argsNames, int argsArr, CodeBuilder cb) {
-        var insightClazz = ClassDesc.of(JvmInsight.class.getName());
-        var boot = ConstantDescs.ofCallsiteBootstrap(
-            insightClazz, "metafactory", ConstantDescs.CD_CallSite,
-            ConstantDescs.CD_String, ConstantDescs.CD_Class,
-            ConstantDescs.CD_String, ConstantDescs.CD_String,
-            ConstantDescs.CD_int
-        );
+        var boot = bootMetafactory();
         var thizClass = model.thisClass().constantValue();
         var ref = DynamicCallSiteDesc.of(
             boot, fieldName,
@@ -294,6 +315,32 @@ final class JvmInsightTransform implements ClassTransform {
         var consumeType = MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_Object);
         cb.invokeinterface(callbackClass, "accept", consumeType);
         cb.labelBinding(noCallback);
+    }
+
+    private void onClassEnter(CodeBuilder cb) {
+        String initEvent = "init";
+        String initType = "enter";
+        var boot = bootMetafactory();
+        var thizClass = model.thisClass().constantValue();
+        var ref = DynamicCallSiteDesc.of(
+            boot, initEvent,
+            MethodTypeDesc.of(callbackClass),
+            initType, thizClass,
+            "", "",
+            -1
+        );
+        cb.invokedynamic(ref);
+    }
+
+    private DirectMethodHandleDesc bootMetafactory() {
+        var insightClazz = ClassDesc.of(JvmInsight.class.getName());
+        var boot = ConstantDescs.ofCallsiteBootstrap(
+                insightClazz, "metafactory", ConstantDescs.CD_CallSite,
+                ConstantDescs.CD_String, ConstantDescs.CD_Class,
+                ConstantDescs.CD_String, ConstantDescs.CD_String,
+                ConstantDescs.CD_int
+        );
+        return boot;
     }
 
     private void loadObjectWraper(CodeBuilder cb, ClassDesc typeSymbol, int slot) {

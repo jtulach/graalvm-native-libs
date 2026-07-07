@@ -17,6 +17,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -25,7 +26,6 @@ import org.apidesign.graalvm.insight.JvmInsight.At;
 
 final class JvmInsightClassData {
     private static final Provider PROVIDER = new Provider();
-    private static final JvmInsightClassData GLOBAL = new JvmInsightClassData(null);
     private final Map<JvmInsight.When, List<Convertor>> roots = new EnumMap<>(JvmInsight.When.class);
     private final Map<JvmInsight.When, List<Convertor>> statements = new EnumMap<>(JvmInsight.When.class);
 
@@ -33,34 +33,26 @@ final class JvmInsightClassData {
     }
 
     static final JvmInsightClassData find(Class<?> type) {
-        if (type == null) {
-            return GLOBAL;
-        } else {
-            return PROVIDER.get(type);
-        }
+        Objects.requireNonNull(type);
+        return PROVIDER.get(type);
     }
 
     final Consumer<Map<String, Object>> roots(JvmInsight.At at) {
         var local = roots.get(at.when());
-        var global = GLOBAL.roots.get(at.when());
-        return dispatcher(local, global, at);
+        return dispatcher(local, at);
     }
 
     final Consumer<Map<String, Object>> statements(JvmInsight.At at) {
         var local = statements.get(at.when());
-        var global = GLOBAL.statements.get(at.when());
-        return dispatcher(local, global, at);
+        return dispatcher(local, at);
     }
 
-    private static Consumer<Map<String, Object>> dispatcher(List<Convertor> list1, List<Convertor> list2, JvmInsight.At fqn) {
-        if (list1 == null && list2 == null) {
+    private static Consumer<Map<String, Object>> dispatcher(List<Convertor> list1, JvmInsight.At fqn) {
+        if (list1 == null) {
             return null;
         } else {
             return (value) -> {
-                if (list1 != null) for (var c : list1) {
-                    c.accept(fqn, value);
-                }
-                if (list2 != null) for (var c : list2) {
+                for (var c : list1) {
                     c.accept(fqn, value);
                 }
             };

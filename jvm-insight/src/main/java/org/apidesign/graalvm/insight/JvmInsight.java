@@ -172,7 +172,7 @@ public final class JvmInsight  {
             }
             var instrument = false;
             for (var r : registrations) {
-                if (r.acceptAndEnable(this)) {
+                if (r.filter.test(this)) {
                     instrument = true;
                 }
             }
@@ -391,6 +391,14 @@ public final class JvmInsight  {
         }
     }
 
+    private static Consumer<Map<String, Object>> init(At at) {
+        var insight = find(at.where().getClassLoader());
+        for (var registry : insight.registrations) {
+            registry.init.accept(insight.new Builder(registry, at.where()));
+        }
+        return null;
+    }
+
     private static Consumer<Map<String, Object>> roots(At at) {
         var data = JvmInsightClassData.find(at.where());
         return data.roots(at);
@@ -404,7 +412,7 @@ public final class JvmInsight  {
     private class Registry implements AutoCloseable {
         private final Predicate<? super ClassInfo> filter;
         private final Map<Class<?>, List<JvmInsightClassData.Convertor>> entries = new LinkedHashMap<>();
-        private volatile Consumer<? super Builder> init;
+        private final Consumer<? super Builder> init;
 
         private Registry(Predicate<? super ClassInfo> classFilter, Consumer<? super Builder> block) {
             this.filter = classFilter;
@@ -431,21 +439,6 @@ public final class JvmInsight  {
                 entries.put(bldr.clazz, list);
             }
             list.add(reg);
-        }
-
-        private boolean acceptAndEnable(ClassInfo info) {
-            var accept = filter.test(info);
-            if (accept && init != null) {
-                Consumer<? super Builder> toInit;
-                synchronized (this) {
-                    toInit = init;
-                    init = null;
-                }
-                if (toInit != null) {
-                    toInit.accept(new Builder(this, null));
-                }
-            }
-            return accept;
         }
     }
 }
