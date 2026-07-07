@@ -183,6 +183,11 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 }
                                 if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var info = localTypes.get(store.slot());
+                                    if (info == null) {
+                                        // very likely finally block of try
+                                        info = new VarInfo(null, store.slot(), ConstantDescs.CD_Throwable, null, null);
+                                        localTypes.put(store.slot(), info);
+                                    }
                                     var type = info.typeSymbol();
                                     storeToArray(cb, argsArr, type, store.slot());
                                     continue;
@@ -207,6 +212,16 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                     onHook("enter", "roots", method, -1, argsNames, argsArr, cb);
                                     enterLabel = label;
                                 }
+                                /*
+                                var optStack = code.findAttribute(Attributes.stackMapTable());
+                                if (optStack.isPresent()) {
+                                    for (var stEn : optStack.get().entries()) {
+                                        if (stEn.target() == label) {
+                                            System.err.println("found entry: " + stEn);
+                                        }
+                                    }
+                                }
+                                */
                                 try (
                                     var updateNamesArr = new AutoCloseable() {
                                         private boolean ready;

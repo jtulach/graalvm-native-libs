@@ -118,6 +118,14 @@ public final class JvmInsight  {
             this.loader = loader;
         }
 
+        /** Fully qualified name with dots. E.g. {@code java.lang.String}.
+         *
+         * @return name in the {@link Class#getName()} format
+         */
+        public final String name() {
+            return name.replace('/', '.');
+        }
+
         /** Fully qualified name with slashes. E.g. {@code java/lang/String}.
          *
          * @return name in the JVM ready format

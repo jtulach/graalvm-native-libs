@@ -16,10 +16,12 @@ package org.apidesign.graalvm.insight;
 import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -81,6 +83,19 @@ public class JvmInsightTest {
         var res = (Number) methodFac.invoke(null, 5);
         assertEquals(120, res.intValue(), "Factorial is computed");
         assertEquals(15, sum[0], "Sum is being added to");
+    }
+
+    @Test
+    public void testFacEx() throws Exception {
+        var method = loadFactorialClass().getMethod("facEx", int.class, int[].class);
+        var res = new int[1];
+        try {
+
+            method.invoke(null, 6, res);
+            fail("facEx method shall always yield an exception");
+        } catch (ReflectiveOperationException ex) {
+            assertEquals(720, res[0], "Yields correct result");
+        }
     }
 
     @Test

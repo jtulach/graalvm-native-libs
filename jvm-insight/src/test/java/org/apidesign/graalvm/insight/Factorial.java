@@ -73,6 +73,19 @@ public final class Factorial {
         return sum;
     }
 
+    public static void facEx(int n, int[] res) {
+        if (n <= 1) {
+            res[0] = 1;
+            throw new IllegalStateException();
+        } else {
+            try {
+                facEx(n - 1, res);
+            } finally {
+                res[0] = res[0] * n;
+            }
+        }
+    }
+
     public static int allTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,
