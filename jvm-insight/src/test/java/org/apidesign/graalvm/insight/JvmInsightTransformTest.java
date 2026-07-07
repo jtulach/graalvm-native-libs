@@ -48,6 +48,11 @@ public class JvmInsightTransformTest {
         assertTransform("java/util/ArrayList.class");
     }
 
+    @Test
+    public void testTransformIdentityHashMapIterator() throws Exception {
+        assertTransform("java/util/IdentityHashMap$IdentityHashMapIterator.class");
+    }
+
     private static void assertTransform(String rsrc) throws IOException {
         var is = ClassLoader.getPlatformClassLoader().getResourceAsStream(rsrc);
         assertNotNull(is, "Resource " + rsrc + " found");

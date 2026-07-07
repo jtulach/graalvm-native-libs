@@ -168,6 +168,10 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             }
                             if (instr instanceof LoadInstruction load) {
                                 var info = localTypes.get(load.slot());
+                                if (info == null) {
+                                    info = new VarInfo(null, load.slot(), ConstantDescs.CD_Object, null, null);
+                                    localTypes.put(load.slot(), info);
+                                }
                                 locals.put(load.slot(), info);
                                 if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var type = info.typeSymbol();
