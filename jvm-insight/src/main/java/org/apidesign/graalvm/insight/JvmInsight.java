@@ -103,7 +103,7 @@ public final class JvmInsight  {
     }
 
     /** Info about class to be loaded. In addition to providing various
-     * info about the class to be loaded, it also implements a {@like CharSequence}
+     * info about the class to be loaded, it also implements a {@link CharSequence}
      * representing the same content of {@link #name()}, so filters
      * can work with generic type when just a name is enough to filter.
      */
@@ -113,17 +113,9 @@ public final class JvmInsight  {
         private final ClassLoader loader;
 
         ClassInfo(String name, Module module, ClassLoader loader) {
-            this.name = name;
+            this.name = name.replace('.', '/');
             this.module = module;
             this.loader = loader;
-        }
-
-        /** Fully qualified, cannonical name of the class. E.g. {@code java.lang.String}.
-         *
-         * @return name in the same format as {@link Class#getName()}
-         */
-        public final String name() {
-            return name;
         }
 
         /** Fully qualified name with slashes. E.g. {@code java/lang/String}.
@@ -131,7 +123,7 @@ public final class JvmInsight  {
          * @return name in the JVM ready format
          */
         public final String jvmName() {
-            return name.replace('.', '/');
+            return name;
         }
 
         /** The classloader loading this class.
@@ -142,19 +134,28 @@ public final class JvmInsight  {
             return loader;
         }
 
-        /** @return {@code name().length()} */
+        /** Same string as {@link #jvmName()}.
+         *
+         * @return name of the class.
+         */
+        @Override
+        public String toString() {
+            return name;
+        }
+
+        /** @return {@code jvmName().length()} */
         @Override
         public int length() {
             return name.length();
         }
 
-        /** @return {@code name().charAt(index)} */
+        /** @return {@code jvmName().charAt(index)} */
         @Override
         public char charAt(int index) {
             return name.charAt(index);
         }
 
-        /** @return {@code name().subSequence(start, end)} */
+        /** @return {@code jvmName().subSequence(start, end)} */
         @Override
         public CharSequence subSequence(int start, int end) {
             return name.subSequence(start, end);
@@ -178,7 +179,6 @@ public final class JvmInsight  {
             }
             return instrument;
         }
-
     }
 
     /** Type of JVM Insight event. */
@@ -187,7 +187,10 @@ public final class JvmInsight  {
     }
 
     /** Identifies a location of JVM Insight event. It carries individual
-     * informations about {@link #line()}, {@link
+     * informations about {@link #line()}, {@link #when()}, {@link #where()}
+     * as well as implements {@link CharSequence} that represents fully
+     * qualified identification of the location - equivalent
+     * of {@link #toString()}.
      */
     public static final class At implements CharSequence {
         private final When when;
@@ -212,22 +215,37 @@ public final class JvmInsight  {
                 + methodDescriptor;
         }
 
+        /**
+         * @return when this event was triggered
+         */
         public When when() {
             return when;
         }
 
+        /**
+         * @return the class that contains this location
+         */
         public Class<?> where() {
             return clazz;
         }
 
+        /**
+         * @return method descriptor
+         */
         public String descriptor() {
             return methodDescriptor;
         }
 
+        /**
+         * @return method name
+         */
         public String name() {
             return methodName;
         }
 
+        /**
+         * @return line number or {@code -1} if not known
+         */
         public int line() {
             return line;
         }
@@ -240,8 +258,11 @@ public final class JvmInsight  {
          *   <li>type is a JVM name of the {@link #where()} type - something like {@code Ljava/lang/String;}</li>
          *   <li>method is {@link #name()} followed by the {@link #descriptor()}</li>
          * </ul>
+         * This class implements {@link CharSequence}. The value of such a
+         * sequence is identical to the value of the string returned by this
+         * method.
          *
-         * @return
+         * @return fully qualified identification of this location
          */
         @Override
         public String toString() {

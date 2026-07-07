@@ -48,6 +48,9 @@ final class JvmInsightAgent implements ClassFileTransformer {
     }
 
     private static void registerAgent(String args, Instrumentation instr) throws Exception {
+        if (args == null) {
+            throw new NullPointerException("Specify name of class with insightmain method as argument!");
+        }
         JvmInsightInitializer.withInstrumentation(instr);
 
         var agent = new JvmInsightAgent(instr);
