@@ -19,9 +19,9 @@ graalvm-native-libs$ cd examples/jvmchannel
 jvmlauncher$ mvn -Pnative package
 ```
 Such a compilation turns [FactorialViaChannel](./src/main/java/org/apidesign/demo/jvmchannel/FactorialViaChannel.java)
-into a native executable `./target/jvmchannel`. Now we can test it:
+into a native executable `./target/demo-jvmchannel`. Now we can test it:
 ```
-jvmlauncher$ ./target/jvmchannel 5
+jvmlauncher$ ./target/demo-jvmchannel 5
 [Substrate VM] Sending 5 to HotSpot JVM
 [OpenJDK 64-Bit Server VM] Parsing 5 as long number
 [OpenJDK 64-Bit Server VM] Result computed to 120 - sending it to the other JVM
