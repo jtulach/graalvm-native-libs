@@ -29,12 +29,12 @@ public class FactorialViaInteropTest {
         var loc = FactorialViaInteropTest.class.getProtectionDomain().getCodeSource().getLocation().toURI();
         var dir = new File(loc);
         while (dir != null) {
-            var win = new File(dir, "jvminterop.exe");
+            var win = new File(dir, "demo-jvminterop.exe");
             if (win.canExecute() && !win.isDirectory()) {
                 prog = win;
                 break;
             }
-            var unix = new File(dir, "jvminterop");
+            var unix = new File(dir, "demo-jvminterop");
             if (unix.canExecute() && !unix.isDirectory()) {
                 prog = unix;
                 break;
@@ -42,7 +42,7 @@ public class FactorialViaInteropTest {
             dir = dir.getParentFile();
         }
 
-        assertTrue(prog != null && prog.canExecute(), "Cannot find jvminterop executable searching from " + loc);
+        assertTrue(prog != null && prog.canExecute(), "Cannot find demo-jvminterop executable searching from " + loc);
     }
 
     @Test

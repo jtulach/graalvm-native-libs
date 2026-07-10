@@ -23,7 +23,7 @@
         <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
-    <artifactId>jvminterop</artifactId>
+    <artifactId>demo-jvminterop</artifactId>
     <packaging>jar</packaging>
 
     <name>Example: Interop Between JVMs</name>
@@ -101,6 +101,7 @@
                         <configuration>
                             <mainClass>${exec.mainClass}</mainClass>
                                 <buildArgs>
+                                    <arg>-Ob</arg>
                                     <arg>-ea</arg>
                                     <arg>-H:+UnlockExperimentalVMOptions</arg>
                                     <arg>-H:+JDWP</arg>
