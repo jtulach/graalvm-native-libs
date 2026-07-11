@@ -87,6 +87,7 @@
                         <manifestEntries>
                             <Agent-Class>org.apidesign.graalvm.insight.JvmInsightAgent</Agent-Class>
                             <Premain-Class>org.apidesign.graalvm.insight.JvmInsightAgent</Premain-Class>
+                            <Boot-Class-Path>./${project.build.finalName}.jar</Boot-Class-Path>
                         </manifestEntries>
                     </archive>
                 </configuration>

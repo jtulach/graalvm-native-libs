@@ -13,7 +13,7 @@
  */
 
 // $ javac -cp ${jvminsight} Fac.java PrintingCallback.java -g -d ${classes}
-// $ java -cp ${classes} -javaagent:${jvminsight}=e2e.PrintingCallback,classes=.*Fac,methods=.*fac.* Fac
+// $ java -cp ${classes} -javaagent:${jvminsight}=e2e.PrintingCallback,classes=.*Fac,methods=.*fac.* Fac 5
 // > fac(5) = 120
 // 2> [JvmInsightAgent]: Transforming Fac
 // 2> enter Fac.main
@@ -37,7 +37,8 @@ class Fac {
 
     static void main(String... args) {
         System.err.println("enter Fac.main");
-        System.out.println("fac(5) = " + fac(5));
+        var n = Integer.parseInt(args[0]);
+        System.out.println("fac(" + n + ") = " + fac(n));
         System.err.println("exit Fac.main");
     }
 }

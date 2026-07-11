@@ -59,7 +59,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
         var className= comma == -1 ? args : args.substring(0, comma);
         var remainingArgs = comma == -1 ? "" : args.substring(comma + 1);
 
-        var insightMainClass = Class.forName(className);
+        var insightMainClass = Class.forName(className, true, ClassLoader.getSystemClassLoader());
         var insightMainMethod = insightMainClass.getMethod("insightmain", String.class, JvmInsight.class);
         insightMainMethod.invoke(null, remainingArgs, agent.insight);
 
