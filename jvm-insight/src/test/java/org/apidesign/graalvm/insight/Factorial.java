@@ -86,6 +86,15 @@ public final class Factorial {
         }
     }
 
+    public int facInst(int n) {
+        if (n <= 1) {
+            return 1;
+        } else {
+            int n1 = facInst(n - 1);
+            return n * n1;
+        }
+    }
+
     public static int allTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,

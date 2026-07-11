@@ -19,10 +19,10 @@
 // 2> [Insight] patch: java/util/concurrent/CopyOnWriteArraySet => true
 // 2> [JvmInsightAgent]: Transforming java/util/concurrent/CopyOnWriteArraySet
 // 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.<init>()V frame: {this=null}
-// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=A, this=null}
-// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=B, this=null}
-// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=X, this=null}
-// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.iterator()Ljava/util/Iterator; frame: {this=null}
+// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=A, this=[]}
+// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=B, this=[A]}
+// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=X, this=[A, B]}
+// 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.iterator()Ljava/util/Iterator; frame: {this=[A, B, X]}
 // $ exit
 
 class AddToArray {

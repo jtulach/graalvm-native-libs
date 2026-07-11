@@ -21,7 +21,8 @@ import org.apidesign.graalvm.insight.JvmInsight;
 public final class Insight {
   public static void insightmain(String args, org.apidesign.graalvm.insight.JvmInsight insight) throws Exception {
     var prefix = findPrefix(args);
-
+    var in = new ThreadLocal<Boolean>();
+    in.set(false);
     insight.configure((n) -> {
         var patch = n.jvmName().startsWith(prefix);
         if (patch) {
@@ -30,7 +31,14 @@ public final class Insight {
         return patch;
     }, (bldr) -> {
         bldr.when(JvmInsight.When.ENTER).methodName(Pattern.compile(".*")).roots().call((at, frame) -> {
-            System.err.println("[Insight] at: " + at + " frame: " + frame);
+            if (!in.get()) {
+                try {
+                    in.set(true);
+                    System.err.println("[Insight] at: " + at + " frame: " + frame);
+                } finally {
+                    in.set(false);
+                }
+            }
         });
     });
   }

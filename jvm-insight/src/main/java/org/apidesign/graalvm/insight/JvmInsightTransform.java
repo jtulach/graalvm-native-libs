@@ -46,6 +46,7 @@ import java.util.function.Consumer;
 /** Transformer patching byte code to be {@link JvmInsight}-ready.
  */
 final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder> {
+    private static final String INIT_METHOD = "<init>";
     private static final String CLASS_INIT_METHOD = "<clinit>";
     private final ClassModel model;
     private final ClassDesc callbackClass;
@@ -115,6 +116,12 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 cb.dup(); // arrayref
                                 cb.loadConstant(slot); // index
                                 loadObjectWraper(cb, typeDescr, slot); // value
+                                cb.arrayStore(TypeKind.REFERENCE);
+                            }
+                            if (!method.flags().has(AccessFlag.STATIC) && !method.methodName().equalsString(INIT_METHOD)) {
+                                cb.dup();
+                                cb.loadConstant(0); // this
+                                cb.aload(0);
                                 cb.arrayStore(TypeKind.REFERENCE);
                             }
                             argsArr = maxSlotIndex;

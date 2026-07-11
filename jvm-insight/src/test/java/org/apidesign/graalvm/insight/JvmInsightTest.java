@@ -16,7 +16,6 @@ package org.apidesign.graalvm.insight;
 import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -81,6 +80,41 @@ public class JvmInsightTest {
 
         var methodFac = loadFactorialClass().getMethod("fac", int.class);
         var res = (Number) methodFac.invoke(null, 5);
+        assertEquals(120, res.intValue(), "Factorial is computed");
+        assertEquals(15, sum[0], "Sum is being added to");
+    }
+
+    @Test
+    public void testFactorialInstanceMethodInvocation() throws Exception {
+        var sum = new int[1];
+        var counter = (BiConsumer<CharSequence, Map<String, Object>>) (at, frame) -> {
+            var methodName = at.toString();
+            if (!methodName.contains("facInst")) {
+                return;
+            }
+            assertTrue(methodName.endsWith("facInst(I)I"), "There is int facInst(int): " + methodName);
+
+
+            assertTrue(frame.containsKey("n"), "key n is present");
+            var n = (Number) frame.get("n");
+            assertNotNull(n, "Local variable n is defined");
+
+            assertTrue(frame.containsKey("this"), "key this is present");
+            var thiz = frame.get("this");
+            assertNotNull(thiz, "Local variable this is defined");
+            sum[0] += n.intValue();
+        };
+
+        var jvmInsight = JvmInsight.find(loader);
+        jvmInsight.configure((_) -> true, (insight) -> {
+            insight
+                .roots()
+                .call(counter);
+        });
+
+        var methodFac = loadFactorialClass().getMethod("facInst", int.class);
+        var inst = loadFactorialClass().getConstructor().newInstance();
+        var res = (Number) methodFac.invoke(inst, 5);
         assertEquals(120, res.intValue(), "Factorial is computed");
         assertEquals(15, sum[0], "Sum is being added to");
     }
