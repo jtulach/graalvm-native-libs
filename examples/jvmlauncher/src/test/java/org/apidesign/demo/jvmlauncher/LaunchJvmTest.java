@@ -30,12 +30,12 @@ public class LaunchJvmTest {
         var loc = LaunchJvmTest.class.getProtectionDomain().getCodeSource().getLocation().toURI();
         var dir = new File(loc);
         while (dir != null) {
-            var win = new File(dir, "jvmlauncher.exe");
+            var win = new File(dir, "demo-jvmlauncher.exe");
             if (win.canExecute() && !win.isDirectory()) {
                 prog = win;
                 break;
             }
-            var unix = new File(dir, "jvmlauncher");
+            var unix = new File(dir, "demo-jvmlauncher");
             if (unix.canExecute() && !unix.isDirectory()) {
                 prog = unix;
                 break;
@@ -43,7 +43,7 @@ public class LaunchJvmTest {
             dir = dir.getParentFile();
         }
 
-        assertTrue(prog != null && prog.canExecute(), "Cannot find jvmlauncher executable searching from " + loc);
+        assertTrue(prog != null && prog.canExecute(), "Cannot find demo-jvmlauncher executable searching from " + loc);
     }
 
     @Test

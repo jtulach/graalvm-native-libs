@@ -1,0 +1,109 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apidesign.jvm.persist;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+final class PerMap {
+  private static final int serialVersionUID = 14742; // Use PR number
+  private final Map<Integer, Persistance<?>> ids = new HashMap<>();
+  private final Map<Class<?>, Persistance<?>> types = new HashMap<>();
+  final int versionStamp;
+
+  PerMap(Persistance<?>[] all) {
+    int hash = registerPersistance(PerReferencePeristance.INSTANCE, serialVersionUID);
+    for (var orig : all) {
+      hash = registerPersistance(orig, hash);
+    }
+    versionStamp = hash;
+  }
+
+  private int registerPersistance(Persistance<?> p, int hash) throws IllegalStateException {
+    var prevId = ids.put(p.id, p);
+    if (prevId != null) {
+      throw new IllegalStateException(
+          "Multiple registrations for ID " + p.id + " " + prevId + " != " + p);
+    }
+    hash = Objects.hash(hash, p.id);
+    var prevType = types.put(p.clazz, p);
+    if (prevType != null) {
+      throw new IllegalStateException(
+          "Multiple registrations for " + p.clazz.getName() + " " + prevId + " != " + p);
+    }
+    return hash;
+  }
+
+  @SuppressWarnings(value = "unchecked")
+  private synchronized <T> Persistance<T> searchSupertype(Class<T> type) {
+    // synchronized as it mutes the types map
+    // however over time the types map gets saturated and
+    // the synchronization will get less frequent
+    // please note that Persistance as well as Class (as a key) have all fields final =>
+    // as soon as they become visible from other threads, they have to look consistent
+    if (type == null) {
+      return null;
+    }
+
+    var direct = types.get(type);
+    if (direct != null) {
+      if (!direct.includingSubclasses) {
+        return null;
+      }
+
+      return (Persistance<T>) direct;
+    }
+
+    for (java.lang.Class<?> in : type.getInterfaces()) {
+      var forSuperInterfaces = searchSupertype(in);
+      if (forSuperInterfaces != null) {
+        types.put(type, forSuperInterfaces);
+        return (Persistance<T>) forSuperInterfaces;
+      }
+    }
+
+    if (!type.isInterface()) {
+      var forSuperclass = searchSupertype(type.getSuperclass());
+      if (forSuperclass != null) {
+        types.put(type, forSuperclass);
+        return (Persistance<T>) forSuperclass;
+      }
+    }
+
+    return null;
+  }
+
+  @SuppressWarnings(value = "unchecked")
+  final <T> Persistance<T> forType(Class<T> type) {
+    var p = types.get(type);
+    if (p == null) {
+      p = searchSupertype(type);
+    }
+    if (p == null) {
+      throw PerUtils.raise(
+          RuntimeException.class, new IOException("No persistance for " + type.getName()));
+    }
+    return (Persistance<T>) p;
+  }
+
+  final Persistance<?> forId(int id) {
+    var p = ids.get(id);
+    if (p == null) {
+      throw PerUtils.raise(RuntimeException.class, new IOException("No persistance for " + id));
+    }
+    return p;
+  }
+}

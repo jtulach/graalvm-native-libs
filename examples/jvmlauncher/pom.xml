@@ -23,7 +23,7 @@
         <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
-    <artifactId>jvmlauncher</artifactId>
+    <artifactId>demo-jvmlauncher</artifactId>
     <packaging>jar</packaging>
 
     <name>Example: Launch 2nd JVM</name>
@@ -84,6 +84,7 @@
                         <configuration>
                             <mainClass>${exec.mainClass}</mainClass>
                                 <buildArgs>
+                                    <arg>-Ob</arg>
                                     <arg>-ea</arg>
                                     <arg>-H:+UnlockExperimentalVMOptions</arg>
                                     <arg>-H:+JDWP</arg>
