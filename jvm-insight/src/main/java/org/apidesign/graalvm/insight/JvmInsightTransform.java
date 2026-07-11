@@ -46,8 +46,6 @@ import java.util.function.Consumer;
 /** Transformer patching byte code to be {@link JvmInsight}-ready.
  */
 final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder> {
-    private static final String INIT_METHOD = "<init>";
-    private static final String CLASS_INIT_METHOD = "<clinit>";
     private final ClassModel model;
     private final ClassDesc callbackClass;
     private boolean cinitDone;
@@ -70,7 +68,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
     @Override
     public void accept(ClassBuilder builder) {
         if (!cinitDone) {
-            builder.withMethod(CLASS_INIT_METHOD, MethodTypeDesc.of(ConstantDescs.CD_void), ClassFile.ACC_STATIC, (t) -> {
+            builder.withMethod(ConstantDescs.CLASS_INIT_NAME, MethodTypeDesc.of(ConstantDescs.CD_void), ClassFile.ACC_STATIC, (t) -> {
                 t.withCode((cb) -> {
                     onClassEnter(cb);
                     cb.return_();
@@ -89,7 +87,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                     && opt.isPresent()
                 ) {
                     mb.withCode(cb -> {
-                        if (method.methodName().equalsString(CLASS_INIT_METHOD)) {
+                        if (method.methodName().equalsString(ConstantDescs.CLASS_INIT_NAME)) {
                             onClassEnter(cb);
                             cinitDone = true;
                         }
@@ -118,7 +116,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 loadObjectWraper(cb, typeDescr, slot); // value
                                 cb.arrayStore(TypeKind.REFERENCE);
                             }
-                            if (!method.flags().has(AccessFlag.STATIC) && !method.methodName().equalsString(INIT_METHOD)) {
+                            if (!method.flags().has(AccessFlag.STATIC) && !method.methodName().equalsString(ConstantDescs.INIT_NAME)) {
                                 cb.dup();
                                 cb.loadConstant(0); // this
                                 cb.aload(0);
