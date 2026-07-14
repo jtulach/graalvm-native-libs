@@ -95,6 +95,12 @@ public final class Factorial {
         }
     }
 
+    public static <E> void forEach(E[] a, java.util.function.Consumer<? super E> action) {
+        for (var e : a) {
+            action.accept(e);
+        }
+    }
+
     public static int allTypes(
         String prefix,
         boolean type_z, byte type_b, short type_s,

@@ -26,11 +26,23 @@
 // $ exit
 
 class AddToArray {
-  public static void main(String... args) {
-    var arr = new java.util.concurrent.CopyOnWriteArraySet<String>();
-    for (var a : args) {
-      arr.add(a);
+    public static void main(String... args) {
+        try {
+            main0(args);
+        } catch (Throwable t) {
+            System.err.println("thr: " + t.getClass());
+            System.err.println("msg: " + t.getMessage());
+            for (var e : t.getStackTrace()) {
+                System.err.println(" e : " + e);
+            }
+        }
     }
-    System.out.println(arr.toString());
-  }
+
+    private static void main0(String[] args) {
+        var arr = new java.util.concurrent.CopyOnWriteArraySet<String>();
+        for (var a : args) {
+            arr.add(a);
+        }
+        System.out.println(arr.toString());
+    }
 }

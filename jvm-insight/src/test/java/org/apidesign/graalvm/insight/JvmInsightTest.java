@@ -16,6 +16,7 @@ package org.apidesign.graalvm.insight;
 import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -165,5 +166,14 @@ public class JvmInsightTest {
         var method = loadFactorialClass().getMethod("simpleConcat", String.class, String.class);
         var res = method.invoke(null, "Hello ", "World!");
         assertEquals("Hello World!", res);
+    }
+
+    @Test
+    public void testForEach() throws Exception {
+        var method = loadFactorialClass().getMethod("forEach", Object[].class, Consumer.class);
+        var res = new StringBuilder();
+        Consumer concat = res::append;
+        method.invoke(null, new String[] { "Hello ", "World!" }, concat);
+        assertEquals("Hello World!", res.toString());
     }
 }
