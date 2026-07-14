@@ -13,7 +13,7 @@
  */
 package org.apidesign.graalvm.insight;
 
-/** Classloader to allow loading patched {@link Factorial} class.
+/** Classloader to allow loading patched {@link Factorial} and {@link ArrList} classes.
  * Our class as well as patched {@link Factorial} class need to have a
  * reference to the same {@link JvmInsight} class. When running unit tests
  * all three classes are loaded by the same classloader. Creating a child
@@ -22,17 +22,19 @@ package org.apidesign.graalvm.insight;
  */
 final class AvoidClassLoader extends ClassLoader {
 
-    private final Class<?> avoid;
+    private final Class<?>[] avoid;
 
-    AvoidClassLoader(Class<?> avoid) {
-        super(avoid.getClassLoader());
+    AvoidClassLoader(Class<?>... avoid) {
+        super(avoid[0].getClassLoader());
         this.avoid = avoid;
     }
 
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        if (avoid.getName().equals(name)) {
-            throw new ClassNotFoundException(name);
+        for (var a : avoid) {
+            if (a.getName().equals(name)) {
+                throw new ClassNotFoundException(name);
+            }
         }
         return super.loadClass(name, resolve);
     }

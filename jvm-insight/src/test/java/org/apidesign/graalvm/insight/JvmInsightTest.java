@@ -48,6 +48,18 @@ public class JvmInsightTest {
         return clazz;
     }
 
+    /** This is the {@link ArrList} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
+    private Class<?> loadArrListClass() throws ClassNotFoundException {
+        var clazz = loader.loadClass(ArrList.class.getName());
+        assertNotEquals(ArrList.class, clazz, "Factorial shall be masked from this loader");
+        assertNotNull(clazz, "Factorial class is loaded");
+        return clazz;
+    }
+
     @BeforeEach
     public void initializeContext() throws Exception {
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
@@ -55,7 +67,7 @@ public class JvmInsightTest {
             JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
             cp
         };
-        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
+        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class, ArrList.class), bothCp);
     }
 
     @Test
@@ -174,6 +186,17 @@ public class JvmInsightTest {
         var res = new StringBuilder();
         Consumer concat = res::append;
         method.invoke(null, new String[] { "Hello ", "World!" }, concat);
+        assertEquals("Hello World!", res.toString());
+    }
+
+    @Test
+    public void testForEachInArrList() throws Exception {
+        Object words = new String[] { "Hello ", "World!" };
+        var inst = loadArrListClass().getConstructor(Object[].class).newInstance(words);
+        var method = loadArrListClass().getMethod("forEach", Consumer.class);
+        var res = new StringBuilder();
+        Consumer concat = res::append;
+        method.invoke(inst, concat);
         assertEquals("Hello World!", res.toString());
     }
 }
