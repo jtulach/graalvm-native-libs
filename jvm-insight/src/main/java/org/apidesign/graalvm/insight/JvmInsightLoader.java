@@ -41,8 +41,8 @@ final class JvmInsightLoader extends URLClassLoader {
         }
         try {
             var arr = is.readAllBytes();
-            var info = jvmInsight.new ClassInfo(name, null, this);
-            var newArr = info.instrumentClass() ?
+            var info = new JvmInsight.ClassInfo(name, null, this);
+            var newArr = info.instrumentClass(jvmInsight) ?
                     patch(arr) :
                     arr;
             /* Enable and inspect with javap -c -private * /

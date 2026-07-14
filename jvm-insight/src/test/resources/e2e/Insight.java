@@ -12,7 +12,6 @@
  * limitations under the License.
  */
 
-import java.util.regex.Pattern;
 import org.apidesign.graalvm.insight.JvmInsight;
 
 /* This is not a class to execute. Thus just: */
@@ -30,7 +29,7 @@ public final class Insight {
         }
         return patch;
     }, (bldr) -> {
-        bldr.when(JvmInsight.When.ENTER).methodName(Pattern.compile(".*")).roots().call((at, frame) -> {
+        bldr.when(JvmInsight.When.ENTER).roots().call((at, frame) -> {
             if (!in.get()) {
                 try {
                     in.set(true);

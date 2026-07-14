@@ -21,7 +21,7 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
+import java.util.function.Predicate;
 import org.apidesign.graalvm.insight.JvmInsight.At;
 
 final class JvmInsightClassData {
@@ -61,10 +61,10 @@ final class JvmInsightClassData {
 
     synchronized Convertor register(
         boolean roots, boolean statements,
-        JvmInsight.When when, Pattern methodFilter,
+        JvmInsight.When when, Predicate<JvmInsight.MethodInfo> methodFilter,
         BiConsumer<? super At, Map<String, Object>> handler
     ) {
-        var c = new Convertor(roots, statements, when, handler);
+        var c = new Convertor(roots, statements, when, methodFilter, handler);
         if (roots) {
             var prev = this.roots.get(c.when);
             if (prev == null) {
@@ -106,20 +106,27 @@ final class JvmInsightClassData {
         private final boolean roots;
         private final boolean statements;
         private final JvmInsight.When when;
+        private final Predicate<JvmInsight.MethodInfo> methodFilter;
         private final BiConsumer<? super At, Map<String, Object>> handler;
 
         private Convertor(
             boolean roots, boolean statements,
-            JvmInsight.When when, BiConsumer<? super At, Map<String, Object>> handler
+            JvmInsight.When when,
+            Predicate<JvmInsight.MethodInfo> methodFilter,
+            BiConsumer<? super At, Map<String, Object>> handler
         ) {
             this.handler = handler;
             this.roots = roots;
             this.when = when;
+            this.methodFilter = methodFilter;
             this.statements = statements;
         }
 
         @Override
         public void accept(At t, Map<String, Object> data) {
+            if (methodFilter != null && !methodFilter.test(t.method())) {
+                return;
+            }
             var names = (String[]) data.get("names");
             var values = (Object[]) data.get("values");
             var frame = new HashMap<String, Object>();

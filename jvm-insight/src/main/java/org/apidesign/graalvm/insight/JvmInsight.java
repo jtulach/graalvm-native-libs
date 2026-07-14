@@ -27,7 +27,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 /** {@link JvmInsight} allows advanced instrumentation to be applied to
  * classes running inside of the JVM.
@@ -107,7 +106,7 @@ public final class JvmInsight  {
      * representing the same content of {@link #name()}, so filters
      * can work with generic type when just a name is enough to filter.
      */
-    public final class ClassInfo implements CharSequence {
+    public final static class ClassInfo implements CharSequence {
         private final String name;
         private final Module module;
         private final ClassLoader loader;
@@ -174,19 +173,131 @@ public final class JvmInsight  {
          * @return true if this class should be instrumented at least by
          *   one of registered insights
          */
-        final boolean instrumentClass() {
+        final boolean instrumentClass(JvmInsight insight) {
             if (name.startsWith("org.apidesign.graalvm.insight.JvmInsight")) {
                 // avoid self recursion
                 return false;
             }
             var instrument = false;
-            for (var r : registrations) {
+            for (var r : insight.registrations) {
                 if (r.filter.test(this)) {
                     instrument = true;
                 }
             }
             return instrument;
         }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 37 * hash + Objects.hashCode(this.name);
+            hash = 37 * hash + Objects.hashCode(this.module);
+            hash = 37 * hash + Objects.hashCode(this.loader);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final ClassInfo other = (ClassInfo) obj;
+            if (!Objects.equals(this.name, other.name)) {
+                return false;
+            }
+            if (!Objects.equals(this.module, other.module)) {
+                return false;
+            }
+            return Objects.equals(this.loader, other.loader);
+        }
+
+
+    }
+
+    /** Info about a method being defined. In addition to providing various
+     * info about the methodto be loaded, it also implements a {@link CharSequence}
+     * giving access to
+     */
+    public static final class MethodInfo implements CharSequence {
+        private final ClassInfo clazz;
+        private final String name;
+        private final String descriptor;
+
+        private MethodInfo(ClassInfo clazz, String methodName, String methodDescriptor) {
+            this.clazz = clazz;
+            this.name = methodName;
+            this.descriptor = methodDescriptor;
+        }
+
+        public ClassInfo clazz() {
+            return clazz;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public String descriptor() {
+            return descriptor;
+        }
+
+        @Override
+        public String toString() {
+            return "L" + clazz().jvmName() + ";." + name() + descriptor();
+        }
+
+        @Override
+        public int length() {
+            return toString().length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return toString().charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return toString().subSequence(start, end);
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 5;
+            hash = 37 * hash + Objects.hashCode(this.clazz);
+            hash = 37 * hash + Objects.hashCode(this.name);
+            hash = 37 * hash + Objects.hashCode(this.descriptor);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final MethodInfo other = (MethodInfo) obj;
+            if (!Objects.equals(this.name, other.name)) {
+                return false;
+            }
+            if (!Objects.equals(this.descriptor, other.descriptor)) {
+                return false;
+            }
+            return Objects.equals(this.clazz, other.clazz);
+        }
+
+
     }
 
     /** Type of JVM Insight event. */
@@ -203,24 +314,18 @@ public final class JvmInsight  {
     public static final class At implements CharSequence {
         private final When when;
         private final Class<?> clazz;
-        private final String methodName;
-        private final String methodDescriptor;
+        private final MethodInfo method;
         private final int line;
         private final String fqn;
 
         private At(
-            When when, Class<?> clazz, String methodName, String methodDescriptor, int line
+            When when, Class<?> clazz, MethodInfo method, int line
         ) {
             this.when = when;
             this.clazz = clazz;
-            this.methodName = methodName;
-            this.methodDescriptor = methodDescriptor;
+            this.method = method;
             this.line = line;
-
-            this.fqn = line + ":L"
-                + clazz.getName().replace('.', '/')
-                + ";." + methodName
-                + methodDescriptor;
+            this.fqn = line + ":" + method;
         }
 
         /**
@@ -230,25 +335,14 @@ public final class JvmInsight  {
             return when;
         }
 
-        /**
-         * @return the class that contains this location
-         */
         public Class<?> where() {
             return clazz;
         }
-
         /**
-         * @return method descriptor
+         * @return method info
          */
-        public String descriptor() {
-            return methodDescriptor;
-        }
-
-        /**
-         * @return method name
-         */
-        public String name() {
-            return methodName;
+        public MethodInfo method() {
+            return method;
         }
 
         /**
@@ -294,11 +388,9 @@ public final class JvmInsight  {
 
         @Override
         public int hashCode() {
-            int hash = 3;
+            int hash = 7;
             hash = 59 * hash + Objects.hashCode(this.when);
-            hash = 59 * hash + Objects.hashCode(this.clazz);
-            hash = 59 * hash + Objects.hashCode(this.methodName);
-            hash = 59 * hash + Objects.hashCode(this.methodDescriptor);
+            hash = 59 * hash + Objects.hashCode(this.method);
             hash = 59 * hash + this.line;
             return hash;
         }
@@ -318,16 +410,10 @@ public final class JvmInsight  {
             if (this.line != other.line) {
                 return false;
             }
-            if (!Objects.equals(this.methodName, other.methodName)) {
-                return false;
-            }
-            if (!Objects.equals(this.methodDescriptor, other.methodDescriptor)) {
-                return false;
-            }
             if (this.when != other.when) {
                 return false;
             }
-            return Objects.equals(this.clazz, other.clazz);
+            return Objects.equals(this.method, other.method);
         }
 
 
@@ -342,7 +428,7 @@ public final class JvmInsight  {
         private final Class<?> clazz;
         private boolean statements;
         private boolean roots;
-        private Pattern methodFilter;
+        private Predicate<MethodInfo> methodFilter;
         private When when = When.ENTER;
 
         private Builder(Registry registry, Class<?> clazz) {
@@ -366,7 +452,7 @@ public final class JvmInsight  {
             return this;
         }
 
-        public Builder methodName(Pattern regExp) {
+        public Builder methods(Predicate<MethodInfo> regExp) {
             this.methodFilter = regExp;
             return this;
         }
@@ -408,9 +494,13 @@ public final class JvmInsight  {
                     At.class
                 )
             );
+            var info = new ClassInfo(
+                clazz.getName(), clazz.getModule(), clazz.getClassLoader()
+            );
+            var method = new MethodInfo(info, methodName, methodDescriptor);
             var at = new At(
                 When.valueOf(when.toUpperCase()),
-                clazz, methodName, methodDescriptor, line
+                clazz, method, line
             );
             var consumer = rawHandle
                 .bindTo(at);
