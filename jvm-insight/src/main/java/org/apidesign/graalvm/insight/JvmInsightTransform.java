@@ -26,10 +26,12 @@ import java.lang.classfile.MethodModel;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
 import java.lang.classfile.attribute.LocalVariableTableAttribute;
+import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LocalVariable;
+import java.lang.classfile.instruction.LocalVariableType;
 import java.lang.classfile.instruction.ReturnInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.constant.ClassDesc;
@@ -38,6 +40,7 @@ import java.lang.constant.DirectMethodHandleDesc;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Optional;
@@ -165,11 +168,16 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             }
                         };
                         // System.err.println("method: " + method.methodName().stringValue());
+                        var stackList = new ArrayList<ClassDesc>();
                         for (var instr : code.elementList()) {
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {
                                 var info = new VarInfo(localVar);
                                 localTypes.put(localVar.slot(), info);
+                            }
+                            if (instr instanceof LocalVariableType) {
+                                // types aren't stored in local variables, skip
+                                continue;
                             }
                             if (instr instanceof LoadInstruction load) {
                                 var info = localTypes.get(load.slot());
@@ -180,12 +188,20 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 locals.put(load.slot(), info);
                                 if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var type = info.typeSymbol();
+                                    stackList.add(type);
                                     loadFromArray(cb, argsArr, type, load.slot());
                                     continue;
                                 }
                             }
                             if (instr instanceof StoreInstruction store) {
                                 var initializedVar = localTypes.get(store.slot());
+                                if (initializedVar == null && store.typeKind() != TypeKind.REFERENCE) {
+                                    var info = new VarInfo(
+                                        null, store.slot(),
+                                        store.typeKind().upperBound(), null, null
+                                    );
+                                    localTypes.put(store.slot(), info);
+                                }
                                 if (initializedVar != null) {
                                     // initializedVar can be null when there is no debug info
                                     locals.put(store.slot(), initializedVar);
@@ -193,8 +209,9 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var info = localTypes.get(store.slot());
                                     if (info == null) {
-                                        // very likely finally block of try
-                                        info = new VarInfo(null, store.slot(), ConstantDescs.CD_Throwable, null, null);
+                                        // read from the stack
+                                        var fromStack = stackList.removeLast();
+                                        info = new VarInfo(null, store.slot(), fromStack, null, null);
                                         localTypes.put(store.slot(), info);
                                     }
                                     var type = info.typeSymbol();
@@ -221,16 +238,31 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                     onHook("enter", "roots", method, -1, argsNames, argsArr, cb);
                                     enterLabel = label;
                                 }
-                                /*
                                 var optStack = code.findAttribute(Attributes.stackMapTable());
                                 if (optStack.isPresent()) {
                                     for (var stEn : optStack.get().entries()) {
                                         if (stEn.target() == label) {
-                                            System.err.println("found entry: " + stEn);
+                                            // System.err.println("found entry: " + stEn);
+                                            stackList.clear();
+                                            for (var s : stEn.stack()) {
+                                                stackList.add(findTypeForStackMapInfo(s));
+                                            }
+                                            // System.err.println("  with stack : " + stackList);
+                                            var cnt = 0;
+                                            for (var verify : stEn.locals()) {
+                                                var type = findTypeForStackMapInfo(verify);
+                                                var prev = localTypes.get(cnt);
+                                                var info = new VarInfo(
+                                                    prev == null ? null : prev.name(),
+                                                    cnt, type, label,
+                                                    prev == null ? null : prev.endScope()
+                                                );
+                                                localTypes.put(cnt, info);
+                                                cnt++;
+                                            }
                                         }
                                     }
                                 }
-                                */
                                 try (
                                     var updateNamesArr = new AutoCloseable() {
                                         private boolean ready;
@@ -277,7 +309,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             }
                         }
                         cb.labelBinding(lastLabel);
-                        var isConstructor = method.methodName().equalsString("<init>");
+                        var isConstructor = method.methodName().equalsString(ConstantDescs.INIT_NAME);
                         if (!isConstructor && enterLabel != null) {
                             var onReturnExceptional = cb.newBoundLabel();
                             onHook("return", "roots", method, -1, argsNames, argsArr, cb);
@@ -511,5 +543,37 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
         cb.pop();
 
         cb.arrayStore(TypeKind.REFERENCE);
+    }
+
+    private ClassDesc findTypeForStackMapInfo(StackMapFrameInfo.VerificationTypeInfo verify) {
+        return switch (verify) {
+            case StackMapFrameInfo.ObjectVerificationTypeInfo obj -> {
+                yield obj.classSymbol();
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.DOUBLE -> {
+                yield ConstantDescs.CD_double;
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.FLOAT -> {
+                yield ConstantDescs.CD_float;
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.INTEGER -> {
+                yield ConstantDescs.CD_int;
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.LONG -> {
+                yield ConstantDescs.CD_long;
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.TOP -> {
+                yield ConstantDescs.CD_Object;
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.NULL -> {
+                yield ConstantDescs.CD_Object;
+            }
+            case StackMapFrameInfo.SimpleVerificationTypeInfo.UNINITIALIZED_THIS -> {
+                yield ConstantDescs.CD_Object;
+            }
+            case StackMapFrameInfo.UninitializedVerificationTypeInfo noInit -> {
+                yield ConstantDescs.CD_Object;
+            }
+        };
     }
 }
