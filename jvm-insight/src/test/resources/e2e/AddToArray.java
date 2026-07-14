@@ -25,6 +25,8 @@
 // 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.iterator()Ljava/util/Iterator; frame: {this=[A, B, X]}
 // $ exit
 
+import java.util.Arrays;
+
 class AddToArray {
     public static void main(String... args) {
         try {
@@ -40,7 +42,7 @@ class AddToArray {
 
     private static void main0(String[] args) {
         var arr = new java.util.concurrent.CopyOnWriteArraySet<String>();
-        for (var a : args) {
+        for (var a : Arrays.asList(args)) {
             arr.add(a);
         }
         System.out.println(arr.toString());

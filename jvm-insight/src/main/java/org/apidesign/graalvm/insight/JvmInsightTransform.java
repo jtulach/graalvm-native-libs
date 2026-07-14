@@ -23,11 +23,14 @@ import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.CodeModel;
 import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
+import java.lang.classfile.Opcode;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
 import java.lang.classfile.attribute.LocalVariableTableAttribute;
 import java.lang.classfile.attribute.StackMapFrameInfo;
+import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
+import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LocalVariable;
@@ -232,6 +235,16 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             }
 
                             cb.with(instr);
+
+                            if (instr instanceof FieldInstruction field) {
+                                if (field.opcode() == Opcode.GETSTATIC || field.opcode() == Opcode.GETFIELD) {
+                                    stackList.add(field.typeSymbol());
+                                }
+                            }
+
+                            if (instr instanceof InvokeInstruction invoke) {
+                                stackList.add(invoke.typeSymbol().returnType());
+                            }
 
                             if (instr instanceof Label label) {
                                 if (enterLabel == null) {
