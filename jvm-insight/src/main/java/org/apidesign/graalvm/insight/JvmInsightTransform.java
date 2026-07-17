@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.function.Consumer;
 
 /** Transformer patching byte code to be {@link JvmInsight}-ready.
@@ -87,11 +88,8 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
     public void accept(ClassBuilder builder, ClassElement element) {
         if (element instanceof MethodModel method) {
             builder.transformMethod(method, (mb, me) -> {
-                if (
-                    me instanceof CodeModel code
-                    && code.findAttribute(Attributes.localVariableTable()) instanceof Optional<LocalVariableTableAttribute> opt
-                    && opt.isPresent()
-                ) {
+                if (me instanceof CodeModel code) {
+                    var opt = code.findAttribute(Attributes.localVariableTable());
                     mb.withCode(cb -> {
                         if (method.methodName().equalsString(ConstantDescs.CLASS_INIT_NAME)) {
                             onClassEnter(cb);
@@ -107,7 +105,10 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                         int argsArr; // slot with reference to array with values
                         int argsNames; // slot with reference to variable names
                         {
-                            var mapOpt = opt.get().localVariables().stream().mapToInt(LocalVariableInfo::slot).max();
+                            var mapOpt = opt.isPresent() ?
+                                opt.get().localVariables().stream().mapToInt(LocalVariableInfo::slot).max()
+                                :
+                                OptionalInt.empty();
                             var maxSlotIndex = mapOpt.isPresent() ? mapOpt.getAsInt() + 1 : 1;
 
                             // copies all the values into an argument
@@ -139,17 +140,19 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             // copies all the values into an argument
                             cb.loadConstant(maxSlotIndex);
                             cb.anewarray(ConstantDescs.CD_String);
-                            for (var localVar : opt.get().localVariables()) {
-                                var slot = localVar.slot();
-                                if (localVar.startPc() == 0) {
-                                    final VarInfo info = new VarInfo(localVar);
-                                    localTypes.put(slot, info);
-                                    locals.put(slot, info);
+                            if (opt.isPresent()) {
+                                for (var localVar : opt.get().localVariables()) {
+                                    var slot = localVar.slot();
+                                    if (localVar.startPc() == 0) {
+                                        final VarInfo info = new VarInfo(localVar);
+                                        localTypes.put(slot, info);
+                                        locals.put(slot, info);
 
-                                    cb.dup(); // arrayref
-                                    cb.loadConstant(slot); // index
-                                    cb.loadConstant(info.name()); // value
-                                    cb.arrayStore(TypeKind.REFERENCE);
+                                        cb.dup(); // arrayref
+                                        cb.loadConstant(slot); // index
+                                        cb.loadConstant(info.name()); // value
+                                        cb.arrayStore(TypeKind.REFERENCE);
+                                    }
                                 }
                             }
                             cb.localVariable(argsNames, "$JvmInsight$names",
@@ -160,7 +163,8 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
 
                             cb.labelBinding(firstLabel);
                         }
-                        var endOfStatement = new Object() {
+                        var onStatement = new Object() {
+                            boolean onMethodEnter;
                             LineNumber lastLine;
 
                             final void endOfLine() {
@@ -168,6 +172,18 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                     onHook("return", "statements", method, lastLine.line(), argsNames, argsArr, cb);
                                     lastLine = null;
                                 }
+                            }
+
+                            final void emitRootEnter() {
+                                if (!onMethodEnter) {
+                                    onMethodEnter = true;
+                                    onHook("enter", "roots", method, -1, argsNames, argsArr, cb);
+                                }
+                            }
+
+                            final void newLine(int line) {
+                                emitRootEnter();
+                                onHook("enter", "statements", method, line, argsNames, argsArr, cb);
                             }
                         };
                         // System.err.println("method: " + method.methodName().stringValue());
@@ -230,7 +246,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 continue;
                             }
                             if (instr instanceof ReturnInstruction ret) {
-                                endOfStatement.endOfLine();
+                                onStatement.endOfLine();
                                 onHook("return", "roots", method, -1, argsNames, argsArr, cb);
                             }
 
@@ -248,7 +264,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
 
                             if (instr instanceof Label label) {
                                 if (enterLabel == null) {
-                                    onHook("enter", "roots", method, -1, argsNames, argsArr, cb);
+                                    onStatement.emitRootEnter();
                                     enterLabel = label;
                                 }
                                 var optStack = code.findAttribute(Attributes.stackMapTable());
@@ -316,9 +332,9 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 }
                             }
                             if (instr instanceof LineNumber line) {
-                                endOfStatement.endOfLine();
-                                endOfStatement.lastLine = line;
-                                onHook("enter", "statements", method, line.line(), argsNames, argsArr, cb);
+                                onStatement.endOfLine();
+                                onStatement.lastLine = line;
+                                onStatement.newLine(line.line());
                             }
                         }
                         cb.labelBinding(lastLabel);

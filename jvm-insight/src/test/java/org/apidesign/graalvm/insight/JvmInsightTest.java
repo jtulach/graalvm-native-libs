@@ -13,12 +13,15 @@
  */
 package org.apidesign.graalvm.insight;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import org.apidesign.graalvm.insight.samples.Factorial;
 import org.apidesign.graalvm.insight.samples.ArrList;
 import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import org.apidesign.graalvm.insight.samples.Greetings;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.Test;
  */
 public class JvmInsightTest {
     private ClassLoader loader;
+    private JvmInsight jvmInsight;
 
     /** This is the {@link Factorial} class loaded by different classloader.
      * That classloader patches the bytecode of the loaded classes to be
@@ -57,8 +61,20 @@ public class JvmInsightTest {
      */
     private Class<?> loadArrListClass() throws ClassNotFoundException {
         var clazz = loader.loadClass(ArrList.class.getName());
-        assertNotEquals(ArrList.class, clazz, "Factorial shall be masked from this loader");
-        assertNotNull(clazz, "Factorial class is loaded");
+        assertNotEquals(ArrList.class, clazz, "Class shall be masked from this loader");
+        assertNotNull(clazz, "Class is loaded");
+        return clazz;
+    }
+
+    /** This is the {@link Greetings} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
+    private Class<?> loadGreetingsClass() throws ClassNotFoundException {
+        var clazz = loader.loadClass(Greetings.class.getName());
+        assertNotEquals(Greetings.class, clazz, "Class shall be masked from this loader");
+        assertNotNull(clazz, "Class is loaded");
         return clazz;
     }
 
@@ -70,6 +86,7 @@ public class JvmInsightTest {
             cp
         };
         loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class.getClassLoader()), bothCp);
+        jvmInsight = JvmInsight.find(loader);
     }
 
     @Test
@@ -86,7 +103,6 @@ public class JvmInsightTest {
             sum[0] += n.intValue();
         };
 
-        var jvmInsight = JvmInsight.find(loader);
         jvmInsight.configure((_) -> true, (insight) -> {
             insight
                 .roots()
@@ -120,7 +136,6 @@ public class JvmInsightTest {
             sum[0] += n.intValue();
         };
 
-        var jvmInsight = JvmInsight.find(loader);
         jvmInsight.configure((_) -> true, (insight) -> {
             insight
                 .roots()
@@ -200,5 +215,24 @@ public class JvmInsightTest {
         Consumer concat = res::append;
         method.invoke(inst, concat);
         assertEquals("Hello World!", res.toString());
+    }
+
+    @Test
+    public void testAllGreetingsMethodsInstrumented() throws Exception {
+        var arr = new ByteArrayOutputStream();
+        var out = new PrintStream(arr);
+        try (var _ = jvmInsight.configure((_) -> true, (bldr) -> {
+            bldr.roots().call((t, u) -> {
+                out.println(t);
+            });
+        })) {
+            var method = loadGreetingsClass().getMethod("out", PrintStream.class);
+            method.invoke(null, out);
+        }
+        assertEquals("""
+        -1:Lorg/apidesign/graalvm/insight/samples/Greetings;.out(Ljava/io/PrintStream;)V
+        -1:Lorg/apidesign/graalvm/insight/samples/Greetings;.greeting()Ljava/lang/String;
+        Hello JVM Insight!
+        """, arr.toString());
     }
 }
