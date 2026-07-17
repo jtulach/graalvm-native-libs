@@ -74,6 +74,7 @@ public final class JvmInsightEspressoTest {
                 .allowAccessAnnotatedBy(HostAccess.Export.class)
                 .allowImplementationsAnnotatedBy(FunctionalInterface.class)
                 .allowMapAccess(true)
+                .allowArrayAccess(true)
                 .build();
         var b = Context.newBuilder("js", "java")
                 .option("java.Classpath", new File(cp.toURI()).getAbsolutePath())
@@ -360,7 +361,7 @@ public final class JvmInsightEspressoTest {
         try (
             var _ = jvm.applyInsight(ctx, insight, "step-over.js")
         ) {
-            var hi= jvm.invokeFactorialMethodString("simpleConcat", "Hi", "There!");
+            var hi= jvm.invokeFactorialMethod(String.class, "simpleConcat", "Hi", "There!");
             assertEquals("HiThere!", hi);
         }
         assertEquals("""
@@ -414,6 +415,37 @@ public final class JvmInsightEspressoTest {
         countDown:arg_0=10
         """, out.toString(), "Properly captured output while throwing an exception");
 
+    }
+
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
+    public void testContentOfArray(JvmType jvm) throws Exception {
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                let sb = `${ctx.name.match(/;\\.([\\w]*)/)[1]}:`;
+                let arr = frame["arr"];
+                let size = arr.length;
+                for (var i = 0; i < size; i++) {
+                   sb = sb + arr[i] + " ";
+                }
+                print(sb);
+            }, {
+                roots : true,
+                rootNameFilter : '.*forEach.*'
+            });
+            """;
+        try (
+            var _ = jvm.applyInsight(ctx, insight, "dumpArgs.js")
+        ) {
+            var array = jvm.invokeFactorialMethod(Object.class, "fourElementArray");
+            var noAction = jvm.invokeFactorialMethod(Object.class, "noAction");
+            jvm.invokeFactorialMethod(String.class, "forEach", array, noAction);
+        }
+        assertEquals("""
+            forEach:2 3 5 8""",
+            out.toString().trim(),
+            "Properly captured output while throwing an exception"
+        );
     }
 
 
@@ -536,9 +568,9 @@ public final class JvmInsightEspressoTest {
             };
         }
 
-        final String invokeFactorialMethodString(String name, Object... args) {
+        final <T> T invokeFactorialMethod(Class<T> resultType, String name, Object... args) {
             return switch (this) {
-                case ESPRESSO -> Factorial.invokeMember(name, args).asString();
+                case ESPRESSO -> Factorial.invokeMember(name, args).as(resultType);
                 case JVM -> {
                     try {
                         for (var m : FactorialHosted().getMethods()) {
@@ -546,7 +578,7 @@ public final class JvmInsightEspressoTest {
                                 continue;
                             }
                             var value = m.invoke(null, args);
-                            yield (String) value;
+                            yield resultType.cast(value);
                         }
                         throw new IllegalStateException("Cannot find " + name);
                     } catch (ReflectiveOperationException ex) {

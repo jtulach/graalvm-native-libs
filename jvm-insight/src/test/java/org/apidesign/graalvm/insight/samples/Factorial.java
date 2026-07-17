@@ -95,8 +95,8 @@ public final class Factorial {
         }
     }
 
-    public static <E> void forEach(E[] a, java.util.function.Consumer<? super E> action) {
-        for (var e : a) {
+    public static <E> void forEach(E[] arr, java.util.function.Consumer<? super E> action) {
+        for (var e : arr) {
             action.accept(e);
         }
     }
@@ -151,5 +151,13 @@ public final class Factorial {
         var mt = MethodType.methodType(int.class);
         var handle = lkp.findStatic(Factorial.class, "meaning", mt);
         meaningSite.setTarget(handle);
+    }
+
+    public static java.util.function.Consumer<Object> noAction() {
+        return (_) -> {};
+    }
+
+    public static Object[] fourElementArray() {
+        return new Object[] { 2, 3, 5, 8 };
     }
 }
