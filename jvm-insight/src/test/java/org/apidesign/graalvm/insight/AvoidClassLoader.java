@@ -21,20 +21,14 @@ package org.apidesign.graalvm.insight;
  * class. That's what the {@link AvoidingLoader} does.
  */
 final class AvoidClassLoader extends ClassLoader {
-
-    private final Class<?>[] avoid;
-
-    AvoidClassLoader(Class<?>... avoid) {
-        super(avoid[0].getClassLoader());
-        this.avoid = avoid;
+    AvoidClassLoader(ClassLoader parent) {
+        super(parent);
     }
 
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        for (var a : avoid) {
-            if (a.getName().equals(name)) {
-                throw new ClassNotFoundException(name);
-            }
+        if (name.startsWith("org.apidesign.graalvm.insight.samples.")) {
+            throw new ClassNotFoundException(name);
         }
         return super.loadClass(name, resolve);
     }

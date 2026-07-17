@@ -13,6 +13,7 @@
  */
 package org.apidesign.graalvm.insight;
 
+import org.apidesign.graalvm.insight.samples.Factorial;
 import java.io.IOException;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
@@ -44,7 +45,7 @@ public class SimpleCallSiteTest {
     @BeforeAll
     public static void initFactorialHosted() throws Exception {
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
-        var loader = new CallSiteLoader(new AvoidClassLoader(Factorial.class), cp);
+        var loader = new CallSiteLoader(new AvoidClassLoader(Factorial.class.getClassLoader()), cp);
         FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");

@@ -13,6 +13,8 @@
  */
 package org.apidesign.graalvm.insight;
 
+import org.apidesign.graalvm.insight.samples.Factorial;
+import org.apidesign.graalvm.insight.samples.ArrList;
 import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -61,13 +63,13 @@ public class JvmInsightTest {
     }
 
     @BeforeEach
-    public void initializeContext() throws Exception {
+    public void initializeJvmInsight() throws Exception {
         var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
         var bothCp = new URL[] {
             JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
             cp
         };
-        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class, ArrList.class), bothCp);
+        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class.getClassLoader()), bothCp);
     }
 
     @Test

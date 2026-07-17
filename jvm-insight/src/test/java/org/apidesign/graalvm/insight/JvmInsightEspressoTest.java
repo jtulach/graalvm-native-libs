@@ -13,6 +13,7 @@
  */
 package org.apidesign.graalvm.insight;
 
+import org.apidesign.graalvm.insight.samples.Factorial;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
@@ -81,7 +82,7 @@ public final class JvmInsightEspressoTest {
                 .allowNativeAccess(true);
         ctx = b.build();
         ctx.enter();
-        Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.Factorial");
+        Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.samples.Factorial");
         assertNotNull(Factorial, "Class is found");
     }
 
@@ -92,7 +93,7 @@ public final class JvmInsightEspressoTest {
             JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
             cp
         };
-        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class), bothCp);
+        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class.getClassLoader()), bothCp);
     }
 
     /** This is the {@link Factorial} class loaded by different classloader.
@@ -137,11 +138,11 @@ public final class JvmInsightEspressoTest {
         }
 
         assertEquals("""
-        Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=5
-        Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=4
-        Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=3
-        Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=2
-        Invoked Lorg/apidesign/graalvm/insight/Factorial;.fac(I)I with n=1
+        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=5
+        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=4
+        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=3
+        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=2
+        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=1
         """, out.toString(), "Properly captured five invocation of fac(n)");
     }
 
@@ -363,12 +364,12 @@ public final class JvmInsightEspressoTest {
             assertEquals("HiThere!", hi);
         }
         assertEquals("""
-        Method entered Lorg/apidesign/graalvm/insight/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;a:Hi,b:There!
+        Method entered Lorg/apidesign/graalvm/insight/samples/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;a:Hi,b:There!
         Step over finished at 34: a:Hi,b:There!,sb:
         Step over finished at 35: a:Hi,b:There!,sb:Hi
         Step over finished at 36: a:Hi,b:There!,sb:HiThere!
         Step over finished at 37: a:Hi,b:There!,sb:HiThere!
-        Method exited Lorg/apidesign/graalvm/insight/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+        Method exited Lorg/apidesign/graalvm/insight/samples/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
         """, out.toString(), "Properly captured output while stepping thru the function");
     }
 
