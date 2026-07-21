@@ -12,13 +12,13 @@
  * limitations under the License.
  */
 
-import org.apidesign.graalvm.insight.JvmInsight;
+import org.apidesign.jvm.insight.JvmInsight;
 
 /* This is not a class to execute. Thus just: */
 // $ exit
 
 public final class Insight {
-  public static void insightmain(String args, org.apidesign.graalvm.insight.JvmInsight insight) throws Exception {
+  public static void insightmain(String args, org.apidesign.jvm.insight.JvmInsight insight) throws Exception {
     var prefix = findPrefix(args);
     var in = new ThreadLocal<Boolean>();
     in.set(false);

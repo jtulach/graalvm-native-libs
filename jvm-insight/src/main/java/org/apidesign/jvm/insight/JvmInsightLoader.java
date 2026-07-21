@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
 import java.io.IOException;
 import java.lang.classfile.ClassFile;

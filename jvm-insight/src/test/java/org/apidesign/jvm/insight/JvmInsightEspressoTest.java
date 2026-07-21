@@ -11,9 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
-import org.apidesign.graalvm.insight.samples.Factorial;
+import org.apidesign.jvm.insight.samples.Factorial;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
@@ -83,7 +83,7 @@ public final class JvmInsightEspressoTest {
                 .allowNativeAccess(true);
         ctx = b.build();
         ctx.enter();
-        Factorial = ctx.getBindings("java").getMember("org.apidesign.graalvm.insight.samples.Factorial");
+        Factorial = ctx.getBindings("java").getMember("org.apidesign.jvm.insight.samples.Factorial");
         assertNotNull(Factorial, "Class is found");
     }
 
@@ -139,11 +139,11 @@ public final class JvmInsightEspressoTest {
         }
 
         assertEquals("""
-        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=5
-        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=4
-        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=3
-        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=2
-        Invoked Lorg/apidesign/graalvm/insight/samples/Factorial;.fac(I)I with n=1
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=5
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=4
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=3
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=2
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=1
         """, out.toString(), "Properly captured five invocation of fac(n)");
     }
 
@@ -365,12 +365,12 @@ public final class JvmInsightEspressoTest {
             assertEquals("HiThere!", hi);
         }
         assertEquals("""
-        Method entered Lorg/apidesign/graalvm/insight/samples/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;a:Hi,b:There!
+        Method entered Lorg/apidesign/jvm/insight/samples/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;a:Hi,b:There!
         Step over finished at 34: a:Hi,b:There!,sb:
         Step over finished at 35: a:Hi,b:There!,sb:Hi
         Step over finished at 36: a:Hi,b:There!,sb:HiThere!
         Step over finished at 37: a:Hi,b:There!,sb:HiThere!
-        Method exited Lorg/apidesign/graalvm/insight/samples/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+        Method exited Lorg/apidesign/jvm/insight/samples/Factorial;.simpleConcat(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
         """, out.toString(), "Properly captured output while stepping thru the function");
     }
 

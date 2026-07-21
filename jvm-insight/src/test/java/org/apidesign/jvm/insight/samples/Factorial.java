@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight.samples;
+package org.apidesign.jvm.insight.samples;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;

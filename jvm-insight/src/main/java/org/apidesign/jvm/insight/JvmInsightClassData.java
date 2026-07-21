@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -22,7 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import org.apidesign.graalvm.insight.JvmInsight.At;
+import org.apidesign.jvm.insight.JvmInsight.At;
 
 final class JvmInsightClassData {
     private static final Provider PROVIDER = new Provider();

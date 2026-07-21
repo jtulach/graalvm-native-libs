@@ -11,9 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
-import org.apidesign.graalvm.insight.samples.Factorial;
+import org.apidesign.jvm.insight.samples.Factorial;
 import java.io.IOException;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;

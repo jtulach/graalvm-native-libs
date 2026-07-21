@@ -16,7 +16,7 @@ package e2e;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
-import org.apidesign.graalvm.insight.JvmInsight;
+import org.apidesign.jvm.insight.JvmInsight;
 
 /* This is not a class to execute. Thus just: */
 // $ exit

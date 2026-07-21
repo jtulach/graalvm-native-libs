@@ -16,7 +16,7 @@ package e2e;
 import java.io.File;
 import java.util.Arrays;
 
-import org.apidesign.graalvm.insight.JvmInsight;
+import org.apidesign.jvm.insight.JvmInsight;
 
 // $ javac -cp ${jvminsight} NativeLauncher.java -g -d ${classes}
 // $ native-image -Ob -cp ${jvminsight}:${classes} \
@@ -25,7 +25,7 @@ import org.apidesign.graalvm.insight.JvmInsight;
 //    -H:Preserve=package=jdk.internal.misc \
 //    -H:Preserve=package=jdk.internal.access \
 //    -H:Preserve=package=java.lang.invoke \
-//    -H:Preserve=package=org.apidesign.graalvm.insight \
+//    -H:Preserve=package=org.apidesign.jvm.insight \
 //    -H:Preserve=package=java.util \
 //    -o ${classes}/native-launcher e2e.NativeLauncher
 // > *

@@ -11,17 +11,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import org.apidesign.graalvm.insight.samples.Factorial;
-import org.apidesign.graalvm.insight.samples.ArrList;
+import org.apidesign.jvm.insight.samples.Factorial;
+import org.apidesign.jvm.insight.samples.ArrList;
 import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import org.apidesign.graalvm.insight.samples.Greetings;
+import org.apidesign.jvm.insight.samples.Greetings;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -230,8 +230,8 @@ public class JvmInsightTest {
             method.invoke(null, out);
         }
         assertEquals("""
-        -1:Lorg/apidesign/graalvm/insight/samples/Greetings;.out(Ljava/io/PrintStream;)V
-        -1:Lorg/apidesign/graalvm/insight/samples/Greetings;.greeting()Ljava/lang/String;
+        -1:Lorg/apidesign/jvm/insight/samples/Greetings;.out(Ljava/io/PrintStream;)V
+        -1:Lorg/apidesign/jvm/insight/samples/Greetings;.greeting()Ljava/lang/String;
         Hello JVM Insight!
         """, arr.toString());
     }

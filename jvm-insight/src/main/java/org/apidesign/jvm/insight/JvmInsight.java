@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
 import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;
@@ -174,7 +174,7 @@ public final class JvmInsight  {
          *   one of registered insights
          */
         final boolean instrumentClass(JvmInsight insight) {
-            if (name.startsWith("org.apidesign.graalvm.insight.JvmInsight")) {
+            if (name.startsWith("org.apidesign.jvm.insight.JvmInsight")) {
                 // avoid self recursion
                 return false;
             }

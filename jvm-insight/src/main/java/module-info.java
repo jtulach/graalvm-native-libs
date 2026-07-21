@@ -11,8 +11,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-module org.apidesign.graalvm.insight {
-    exports org.apidesign.graalvm.insight;
+module org.apidesign.jvm.insight {
+    exports org.apidesign.jvm.insight;
 
     requires static java.instrument;
 }

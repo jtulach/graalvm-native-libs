@@ -11,16 +11,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight.samples;
+package org.apidesign.jvm.insight;
 
-import java.io.PrintStream;
+import java.lang.instrument.Instrumentation;
 
-public class Greetings {
-  public static void out(PrintStream out) throws Exception {
-    out.println(greeting());
-  }
+final class JvmInsightInitializer {
+    private static Instrumentation instrumentation;
 
-  public static String greeting() {
-    return "Hello JVM Insight!";
-  }
+    static void withInstrumentation(Instrumentation instr) {
+        instrumentation = instr;
+    }
+
+    static Object getInstrumentation() {
+        return instrumentation;
+    }
 }

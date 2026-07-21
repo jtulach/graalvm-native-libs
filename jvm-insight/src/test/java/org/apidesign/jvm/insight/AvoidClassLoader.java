@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apidesign.graalvm.insight;
+package org.apidesign.jvm.insight;
 
 /** Classloader to allow loading patched {@link Factorial} and {@link ArrList} classes.
  * Our class as well as patched {@link Factorial} class need to have a
@@ -27,7 +27,7 @@ final class AvoidClassLoader extends ClassLoader {
 
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        if (name.startsWith("org.apidesign.graalvm.insight.samples.")) {
+        if (name.startsWith("org.apidesign.jvm.insight.samples.")) {
             throw new ClassNotFoundException(name);
         }
         return super.loadClass(name, resolve);
