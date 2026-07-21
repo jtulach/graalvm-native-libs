@@ -235,14 +235,30 @@ public final class JvmInsight  {
             this.descriptor = methodDescriptor;
         }
 
+        /** Info about class owning this method. Such an info may be needed
+         * before the actual class is loaded into the JVM, hence it is provided
+         * as {@link ClassInfo}.
+         *
+         * @return the info about class owning this method
+         * @see ClassInfo
+         */
         public ClassInfo clazz() {
             return clazz;
         }
 
+        /** Method name.
+         *
+         * @return non-null name of the method
+         */
         public String name() {
             return name;
         }
 
+        /** JVM descriptor of the method type. Include types of arguments
+         * as well as return type.
+         *
+         * @return descriptor the method type
+         */
         public String descriptor() {
             return descriptor;
         }
@@ -328,24 +344,33 @@ public final class JvmInsight  {
             this.fqn = line + ":" + method;
         }
 
-        /**
+        /** Describes at what moment the event is triggered.
+         *
          * @return when this event was triggered
          */
         public When when() {
             return when;
         }
 
+        /** Identifies the real JVM class where this event is triggered.
+         *
+         * @return real JVM class
+         */
         public Class<?> where() {
             return clazz;
         }
-        /**
-         * @return method info
+
+        /** Identifies the method where this event is triggered.
+         *
+         * @return method info with a reference to {@link ClassInfo}
+         * @see ClassInfo
          */
         public MethodInfo method() {
             return method;
         }
 
-        /**
+        /** Identifies a line where this event is triggered.
+         *
          * @return line number or {@code -1} if not known
          */
         public int line() {
@@ -358,7 +383,7 @@ public final class JvmInsight  {
          * <ul>
          *   <li>line is a number returned by {@link #line()}</li>
          *   <li>type is a JVM name of the {@link #where()} type - something like {@code Ljava/lang/String;}</li>
-         *   <li>method is {@link #name()} followed by the {@link #descriptor()}</li>
+         *   <li>method is {@link MethodInfo#name()} followed by the {@link MethodInfo#descriptor()}</li>
          * </ul>
          * This class implements {@link CharSequence}. The value of such a
          * sequence is identical to the value of the string returned by this
@@ -436,27 +461,53 @@ public final class JvmInsight  {
             this.clazz = clazz;
         }
 
+        /** Specify when this callback should be triggered.
+         *
+         * @param type on enter or on return?
+         * @return this builder
+         */
         public Builder when(When type) {
             Objects.requireNonNull(type);
             this.when = type;
             return this;
         }
 
-        public Builder roots() {
-            this.roots = true;
+        /** Specify whether this callback should be triggered on method enter/exit.
+         *
+         * @param roots specify {@code true} to enable tracking "roots"
+         * @return this builder
+         */
+        public Builder roots(boolean roots) {
+            this.roots = roots;
             return this;
         }
 
-        public Builder statements() {
+        /** Specify whether this callback should be triggered on each line/statement.
+         *
+         * @param statements specify {@code true} to enable tracking "statements"
+         * @return this builder
+         */
+        public Builder statements(boolean statements) {
             this.statements = true;
             return this;
         }
 
-        public Builder methods(Predicate<MethodInfo> regExp) {
-            this.methodFilter = regExp;
+        /** Filter the methods where this callback shall be invoked.
+         *
+         * @param filter a predicate to decide if a method triggers the callback or not
+         * @return this builder
+         * @see MethodInfo
+         */
+        public Builder methods(Predicate<MethodInfo> filter) {
+            this.methodFilter = filter;
             return this;
         }
 
+        /** Finishes building a callback. After configuring the builder
+         * options, call this mehtod to register the callback accordingly.
+         *
+         * @param handler a handler to be invoke when an event happens
+         */
         public void call(BiConsumer<? super At, Map<String, Object>> handler) {
             registry.register(this, handler);
         }

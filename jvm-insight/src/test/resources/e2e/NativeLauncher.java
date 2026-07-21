@@ -58,7 +58,7 @@ public final class NativeLauncher {
         try (var _ = jvmInsight.configure((n) -> {
             return n.name().replace('.', '/').equals(args[1]);
         }, bldr -> {
-            bldr.roots().call((name, localVars) -> {
+            bldr.roots(true).call((name, localVars) -> {
                 if (localVars.containsKey("n")) {
                     System.err.println("[Crema+JvmInsight]: method " + name + " with: " + localVars);
                 }

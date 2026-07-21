@@ -503,10 +503,10 @@ public final class JvmInsightEspressoTest {
                         default -> throw new IllegalStateException(type);
                     }
                     if (Boolean.TRUE.equals(cfg.get("roots"))) {
-                        bldr.roots();
+                        bldr.roots(true);
                     }
                     if (Boolean.TRUE.equals(cfg.get("statements"))) {
-                        bldr.statements();
+                        bldr.statements(true);
                     }
                     bldr.call(handler);
                 });

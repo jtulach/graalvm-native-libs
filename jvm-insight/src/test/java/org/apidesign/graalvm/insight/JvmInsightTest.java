@@ -105,7 +105,7 @@ public class JvmInsightTest {
 
         jvmInsight.configure((_) -> true, (insight) -> {
             insight
-                .roots()
+                .roots(true)
                 .call(counter);
         });
 
@@ -138,7 +138,7 @@ public class JvmInsightTest {
 
         jvmInsight.configure((_) -> true, (insight) -> {
             insight
-                .roots()
+                .roots(true)
                 .call(counter);
         });
 
@@ -222,7 +222,7 @@ public class JvmInsightTest {
         var arr = new ByteArrayOutputStream();
         var out = new PrintStream(arr);
         try (var _ = jvmInsight.configure((_) -> true, (bldr) -> {
-            bldr.roots().call((t, u) -> {
+            bldr.roots(true).call((t, u) -> {
                 out.println(t);
             });
         })) {
