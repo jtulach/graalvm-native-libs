@@ -72,7 +72,7 @@ public final class PrintingCallback implements BiConsumer<CharSequence, Map<Stri
             var okLoader = info.loader() == ClassLoader.getSystemClassLoader();
             return okLoader && classes.matcher(info.name()).matches();
         }, (bldr) -> {
-            bldr.methods(m -> methods.matcher(m).matches()).roots().call(this);
+            bldr.methods(m -> methods.matcher(m).matches()).roots(true).call(this);
         });
     }
 
