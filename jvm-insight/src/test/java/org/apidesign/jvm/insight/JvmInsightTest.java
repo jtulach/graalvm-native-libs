@@ -1,0 +1,238 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apidesign.jvm.insight;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import org.apidesign.jvm.insight.samples.Factorial;
+import org.apidesign.jvm.insight.samples.ArrList;
+import java.net.URL;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import org.apidesign.jvm.insight.samples.Greetings;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Simple bytecode patching tests. Sometimes it is not easy to debug
+ * {@link JvmInsightEspressoTest} as the bytecode being processed there
+ * is <em>too complicated</em>. In such case it is recommended to create
+ * a {@code simpleXyz} test in {@link Factorial} class demonstrating the
+ * problem and test it from this class. E.g. without involving Espresso
+ * at all.
+ */
+public class JvmInsightTest {
+    private ClassLoader loader;
+    private JvmInsight jvmInsight;
+
+    /** This is the {@link Factorial} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
+    private Class<?> loadFactorialClass() throws ClassNotFoundException {
+        var clazz = loader.loadClass(Factorial.class.getName());
+        assertNotEquals(Factorial.class, clazz, "Factorial shall be masked from this loader");
+        assertNotNull(clazz, "Factorial class is loaded");
+        return clazz;
+    }
+
+    /** This is the {@link ArrList} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
+    private Class<?> loadArrListClass() throws ClassNotFoundException {
+        var clazz = loader.loadClass(ArrList.class.getName());
+        assertNotEquals(ArrList.class, clazz, "Class shall be masked from this loader");
+        assertNotNull(clazz, "Class is loaded");
+        return clazz;
+    }
+
+    /** This is the {@link Greetings} class loaded by different classloader.
+     * That classloader patches the bytecode of the loaded classes to be
+     * {@link JvmInsight} capable. As the class is loaded by different classloader
+     * that this testing class, we have to access it via reflection.
+     */
+    private Class<?> loadGreetingsClass() throws ClassNotFoundException {
+        var clazz = loader.loadClass(Greetings.class.getName());
+        assertNotEquals(Greetings.class, clazz, "Class shall be masked from this loader");
+        assertNotNull(clazz, "Class is loaded");
+        return clazz;
+    }
+
+    @BeforeEach
+    public void initializeJvmInsight() throws Exception {
+        var cp = Factorial.class.getProtectionDomain().getCodeSource().getLocation();
+        var bothCp = new URL[] {
+            JvmInsight.class.getProtectionDomain().getCodeSource().getLocation(),
+            cp
+        };
+        loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class.getClassLoader()), bothCp);
+        jvmInsight = JvmInsight.find(loader);
+    }
+
+    @Test
+    public void testFactorialMethodInvocation() throws Exception {
+        var sum = new int[1];
+        var counter = (BiConsumer<CharSequence, Map<String, Object>>) (at, frame) -> {
+            var methodName = at.toString();
+            if (!methodName.contains("fac")) {
+                return;
+            }
+            assertTrue(methodName.endsWith("fac(I)I"), "There is int fac(int): " + methodName);
+            var n = (Number) frame.get("n");
+            assertNotNull(n, "Local variable n is defined");
+            sum[0] += n.intValue();
+        };
+
+        jvmInsight.configure((_) -> true, (insight) -> {
+            insight
+                .roots(true)
+                .call(counter);
+        });
+
+        var methodFac = loadFactorialClass().getMethod("fac", int.class);
+        var res = (Number) methodFac.invoke(null, 5);
+        assertEquals(120, res.intValue(), "Factorial is computed");
+        assertEquals(15, sum[0], "Sum is being added to");
+    }
+
+    @Test
+    public void testFactorialInstanceMethodInvocation() throws Exception {
+        var sum = new int[1];
+        var counter = (BiConsumer<CharSequence, Map<String, Object>>) (at, frame) -> {
+            var methodName = at.toString();
+            if (!methodName.contains("facInst")) {
+                return;
+            }
+            assertTrue(methodName.endsWith("facInst(I)I"), "There is int facInst(int): " + methodName);
+
+
+            assertTrue(frame.containsKey("n"), "key n is present");
+            var n = (Number) frame.get("n");
+            assertNotNull(n, "Local variable n is defined");
+
+            assertTrue(frame.containsKey("this"), "key this is present");
+            var thiz = frame.get("this");
+            assertNotNull(thiz, "Local variable this is defined");
+            sum[0] += n.intValue();
+        };
+
+        jvmInsight.configure((_) -> true, (insight) -> {
+            insight
+                .roots(true)
+                .call(counter);
+        });
+
+        var methodFac = loadFactorialClass().getMethod("facInst", int.class);
+        var inst = loadFactorialClass().getConstructor().newInstance();
+        var res = (Number) methodFac.invoke(inst, 5);
+        assertEquals(120, res.intValue(), "Factorial is computed");
+        assertEquals(15, sum[0], "Sum is being added to");
+    }
+
+    @Test
+    public void testFacEx() throws Exception {
+        var method = loadFactorialClass().getMethod("facEx", int.class, int[].class);
+        var res = new int[1];
+        try {
+
+            method.invoke(null, 6, res);
+            fail("facEx method shall always yield an exception");
+        } catch (ReflectiveOperationException ex) {
+            assertEquals(720, res[0], "Yields correct result");
+        }
+    }
+
+    @Test
+    public void testSimpleLocalValueReturn() throws Exception {
+        var method = loadFactorialClass().getMethod("simpleReturn", int.class);
+        var res = method.invoke(null, 42);
+        assertEquals(42, res);
+    }
+
+    @Test
+    public void testSimpleLocalValueAssign() throws Exception {
+        var method = loadFactorialClass().getMethod("simpleAssign", int.class);
+        var res = method.invoke(null, 6);
+        assertEquals(36, res);
+    }
+
+    @Test
+    public void testSimpleLoopFac() throws Exception {
+        var method = loadFactorialClass().getMethod("simpleFac", int.class);
+        var res = method.invoke(null, 6);
+        assertEquals(720, res);
+    }
+
+    @Test
+    public void testSimpleShortFac() throws Exception {
+        var method = loadFactorialClass().getMethod("simpleShortFac", byte.class);
+        var res = method.invoke(null, (byte)4);
+        assertEquals((short)24, res);
+    }
+
+    @Test
+    public void testSimpleConcat() throws Exception {
+        var method = loadFactorialClass().getMethod("simpleConcat", String.class, String.class);
+        var res = method.invoke(null, "Hello ", "World!");
+        assertEquals("Hello World!", res);
+    }
+
+    @Test
+    public void testForEach() throws Exception {
+        var method = loadFactorialClass().getMethod("forEach", Object[].class, Consumer.class);
+        var res = new StringBuilder();
+        Consumer concat = res::append;
+        method.invoke(null, new String[] { "Hello ", "World!" }, concat);
+        assertEquals("Hello World!", res.toString());
+    }
+
+    @Test
+    public void testForEachInArrList() throws Exception {
+        Object words = new String[] { "Hello ", "World!" };
+        var inst = loadArrListClass().getConstructor(Object[].class).newInstance(words);
+        var method = loadArrListClass().getMethod("forEach", Consumer.class);
+        var res = new StringBuilder();
+        Consumer concat = res::append;
+        method.invoke(inst, concat);
+        assertEquals("Hello World!", res.toString());
+    }
+
+    @Test
+    public void testAllGreetingsMethodsInstrumented() throws Exception {
+        var arr = new ByteArrayOutputStream();
+        var out = new PrintStream(arr);
+        try (var _ = jvmInsight.configure((_) -> true, (bldr) -> {
+            bldr.roots(true).call((t, u) -> {
+                out.println(t);
+            });
+        })) {
+            var method = loadGreetingsClass().getMethod("out", PrintStream.class);
+            method.invoke(null, out);
+        }
+        assertEquals("""
+        -1:Lorg/apidesign/jvm/insight/samples/Greetings;.out(Ljava/io/PrintStream;)V
+        -1:Lorg/apidesign/jvm/insight/samples/Greetings;.greeting()Ljava/lang/String;
+        Hello JVM Insight!
+        """, arr.toString());
+    }
+}

@@ -32,6 +32,7 @@
         <module>persist-dsl</module>
         <module>persist</module>
         <module>jvm-interop</module>
+        <module>jvm-insight</module>
         <module>examples/jvmlauncher</module>
         <module>examples/jvmchannel</module>
         <module>examples/jvminterop</module>
@@ -209,6 +210,10 @@
                             </goals>
                         </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>3.5.5</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
