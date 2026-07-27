@@ -18,20 +18,29 @@ import java.lang.classfile.Label;
 import java.lang.classfile.Opcode;
 import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.instruction.ArrayLoadInstruction;
+import java.lang.classfile.instruction.ArrayStoreInstruction;
 import java.lang.classfile.instruction.BranchInstruction;
 import java.lang.classfile.instruction.ConstantInstruction;
 import java.lang.classfile.instruction.ConvertInstruction;
+import java.lang.classfile.instruction.DiscontinuedInstruction;
 import java.lang.classfile.instruction.FieldInstruction;
+import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeDynamicInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LoadInstruction;
+import java.lang.classfile.instruction.LookupSwitchInstruction;
+import java.lang.classfile.instruction.MonitorInstruction;
 import java.lang.classfile.instruction.NewMultiArrayInstruction;
 import java.lang.classfile.instruction.NewObjectInstruction;
 import java.lang.classfile.instruction.NewPrimitiveArrayInstruction;
 import java.lang.classfile.instruction.NewReferenceArrayInstruction;
+import java.lang.classfile.instruction.NopInstruction;
 import java.lang.classfile.instruction.OperatorInstruction;
+import java.lang.classfile.instruction.ReturnInstruction;
 import java.lang.classfile.instruction.StackInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
+import java.lang.classfile.instruction.TableSwitchInstruction;
+import java.lang.classfile.instruction.ThrowInstruction;
 import java.lang.classfile.instruction.TypeCheckInstruction;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
@@ -77,35 +86,31 @@ final class JvmInsightStack {
      */
     ClassDesc process(Instruction instr, ClassDesc info) {
         // System.err.println("process: " + instr);
-        return switch (instr.opcode().kind()) {
-            case LOAD -> {
-                var load = (LoadInstruction)instr;
+        return switch (instr) {
+            case LoadInstruction load -> {
                 if (info == null) {
                     info = load.typeKind().upperBound();
                 }
                 stackList.add(info);
                 yield null;
             }
-            case STORE -> {
-                var store = (StoreInstruction)instr;
+            case StoreInstruction store -> {
                 assert store.typeKind().upperBound().isPrimitive() == stackList.getLast().isPrimitive();
                 yield stackList.removeLast();
             }
-            case ARRAY_LOAD -> {
-                var load = (ArrayLoadInstruction)instr;
+            case ArrayLoadInstruction load -> {
                 stackList.removeLast();
                 stackList.removeLast();
                 stackList.add(load.typeKind().upperBound());
                 yield null;
             }
-            case ARRAY_STORE -> {
+            case ArrayStoreInstruction _ -> {
                 stackList.removeLast();
                 stackList.removeLast();
                 stackList.removeLast();
                 yield null;
             }
-            case FIELD_ACCESS -> {
-                var field = (FieldInstruction) instr;
+            case FieldInstruction field -> {
                 yield switch (field.opcode()) {
                     case PUTFIELD -> {
                         stackList.removeLast();
@@ -128,26 +133,22 @@ final class JvmInsightStack {
                     default -> throw new IllegalArgumentException();
                 };
             }
-            case CONSTANT -> {
-                var constant = (ConstantInstruction)instr;
+            case ConstantInstruction constant -> {
                 stackList.add(constant.typeKind().upperBound());
                 yield null;
             }
-            case NEW_OBJECT -> {
-                var newo = (NewObjectInstruction)instr;
+            case NewObjectInstruction newo -> {
                 stackList.add(newo.className().asSymbol());
                 yield null;
             }
-            case NEW_REF_ARRAY -> {
-                var newa = (NewReferenceArrayInstruction)instr;
+            case NewReferenceArrayInstruction newa -> {
                 var type = newa.componentType().asSymbol().arrayType();
                 var count = stackList.removeLast();
                 assert count == ConstantDescs.CD_int;
                 stackList.add(type);
                 yield null;
             }
-            case NEW_MULTI_ARRAY -> {
-                var newm = (NewMultiArrayInstruction)instr;
+            case NewMultiArrayInstruction newm -> {
                 removeLastN(newm.dimensions());
                 var type = newm.arrayType().asSymbol();
                 for (int i = 0; i < newm.dimensions(); i++) {
@@ -156,26 +157,22 @@ final class JvmInsightStack {
                 stackList.add(type);
                 yield null;
             }
-            case NEW_PRIMITIVE_ARRAY -> {
-                var newp = (NewPrimitiveArrayInstruction)instr;
+            case NewPrimitiveArrayInstruction newp -> {
                 var type = newp.typeKind().upperBound();
                 var count = stackList.removeLast();
                 assert count == ConstantDescs.CD_int;
                 stackList.add(type);
                 yield null;
             }
-            case INVOKE -> {
-                var invoke = (InvokeInstruction)instr;
+            case InvokeInstruction invoke -> {
                 invokeMethod(invoke.typeSymbol());
                 yield null;
             }
-            case INVOKE_DYNAMIC -> {
-                var invoke = (InvokeDynamicInstruction)instr;
+            case InvokeDynamicInstruction invoke -> {
                 invokeMethod(invoke.typeSymbol());
                 yield null;
             }
-            case OPERATOR -> {
-                var op = (OperatorInstruction)instr;
+            case OperatorInstruction op -> {
                 var unary = switch (op.opcode()) {
                     case INEG, LNEG, FNEG, DNEG -> true;
                     case ARRAYLENGTH -> true;
@@ -188,8 +185,7 @@ final class JvmInsightStack {
                 stackList.add(op.typeKind().upperBound());
                 yield null;
             }
-            case STACK -> {
-                var stack = (StackInstruction)instr;
+            case StackInstruction stack -> {
                 switch (stack.opcode()) {
                     case Opcode.POP -> stackList.removeLast();
                     case Opcode.POP2 -> {
@@ -297,8 +293,7 @@ final class JvmInsightStack {
                 }
                 yield null;
             }
-            case BRANCH -> {
-                var branch = (BranchInstruction)instr;
+            case BranchInstruction branch -> {
                 yield switch (branch.opcode()) {
                     case IF_ACMPEQ, IF_ACMPNE -> {
                         stackList.removeLast();
@@ -325,41 +320,39 @@ final class JvmInsightStack {
                     default -> throw new IllegalArgumentException("Unexpected: " + branch);
                 };
             }
-            case RETURN -> {
+            case ReturnInstruction _ -> {
                 ignoring(instr);
                 yield null;
             }
-            case THROW_EXCEPTION -> {
+            case ThrowInstruction _ -> {
                 stackList.removeLast();
                 yield null;
             }
-            case CONVERT -> {
-                var conv = (ConvertInstruction)instr;
+            case ConvertInstruction conv -> {
                 var from = stackList.removeLast();
                 assert from == conv.fromType().upperBound();
                 stackList.add(conv.toType().upperBound());
                 yield null;
             }
-            case TYPE_CHECK -> {
-                var check = (TypeCheckInstruction)instr;
+            case TypeCheckInstruction check -> {
                 stackList.removeLast();
                 stackList.add(check.type().asSymbol());
                 yield null;
             }
-            case MONITOR -> {
+            case MonitorInstruction _ -> {
                 stackList.removeLast();
                 yield null;
             }
-            case TABLE_SWITCH, LOOKUP_SWITCH -> {
+            case TableSwitchInstruction _, LookupSwitchInstruction _ -> {
                 stackList.removeLast();
                 yield null;
             }
-            case INCREMENT, NOP -> {
+            case IncrementInstruction _, NopInstruction _ -> {
                 // no change
                 yield null;
             }
-            case DISCONTINUED_RET, DISCONTINUED_JSR -> {
-                throw new IllegalStateException("Discontinued: " + instr);
+            case DiscontinuedInstruction discontinued -> {
+                throw new IllegalStateException("Discontinued: " + discontinued);
             }
         };
     }
