@@ -21,14 +21,12 @@ import java.lang.classfile.ClassModel;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.CodeBuilder;
 import java.lang.classfile.CodeModel;
+import java.lang.classfile.Instruction;
 import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
-import java.lang.classfile.Opcode;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
-import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
-import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LineNumber;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.LocalVariable;
@@ -202,7 +200,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 locals.put(load.slot(), info);
                                 if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var type = info.typeSymbol();
-                                    stackList.push(type);
+                                    stackList.process(load, type);
                                     loadFromArray(cb, argsArr, type, load.slot());
                                     continue;
                                 }
@@ -222,9 +220,9 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 }
                                 if (store.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var info = localTypes.get(store.slot());
+                                    var fromStack = stackList.process(store, null);
                                     if (info == null) {
-                                        // read from the stack
-                                        var fromStack = stackList.pop();
+                                        // use info from the stack
                                         info = new VarInfo(null, store.slot(), fromStack, null, null);
                                         localTypes.put(store.slot(), info);
                                     }
@@ -246,15 +244,8 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             }
 
                             cb.with(instr);
-
-                            if (instr instanceof FieldInstruction field) {
-                                if (field.opcode() == Opcode.GETSTATIC || field.opcode() == Opcode.GETFIELD) {
-                                    stackList.push(field.typeSymbol());
-                                }
-                            }
-
-                            if (instr instanceof InvokeInstruction invoke) {
-                                stackList.push(invoke.typeSymbol().returnType());
+                            if (instr instanceof Instruction realInstr) {
+                                stackList.process(realInstr, null);
                             }
 
                             if (instr instanceof Label label) {
