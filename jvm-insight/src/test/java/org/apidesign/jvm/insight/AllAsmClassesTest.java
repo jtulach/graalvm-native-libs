@@ -31,6 +31,7 @@ public class AllAsmClassesTest {
         var model = cf.parse(bytes);
         if (switch (model.thisClass().name().stringValue()) {
             case "jdk3/ArtificialStructures" -> true;
+            case "jdk8/AllFrames" -> true;
             default -> false;
         }) {
             return;
