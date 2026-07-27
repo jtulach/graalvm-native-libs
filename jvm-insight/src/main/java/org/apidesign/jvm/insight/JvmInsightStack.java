@@ -346,9 +346,20 @@ final class JvmInsightStack {
                 stackList.add(check.type().asSymbol());
                 yield null;
             }
-            default -> {
-                System.err.println("ignoring " + instr);
+            case MONITOR -> {
+                stackList.removeLast();
                 yield null;
+            }
+            case TABLE_SWITCH, LOOKUP_SWITCH -> {
+                stackList.removeLast();
+                yield null;
+            }
+            case INCREMENT, NOP -> {
+                // no change
+                yield null;
+            }
+            case DISCONTINUED_RET, DISCONTINUED_JSR -> {
+                throw new IllegalStateException("Discontinued: " + instr);
             }
         };
     }
