@@ -182,8 +182,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 onHook("enter", "statements", method, line, argsNames, argsArr, cb);
                             }
                         };
-                        // System.err.println("method: " + method.methodName().stringValue());
-                        var stackList = new JvmInsightStack();
+                        var stackList = new JvmInsightStack(method.methodName().stringValue());
                         for (var instr : code.elementList()) {
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {

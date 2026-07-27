@@ -27,6 +27,10 @@ import java.util.Map;
 final class JvmInsightStack {
     private final List<ClassDesc> stackList = new ArrayList<>();
 
+    JvmInsightStack(String name) {
+        // System.err.println("STACKFOR: " + name);
+    }
+
     void refresh(StackMapFrameInfo stEn, Map<Integer, JvmInsightTransform.VarInfo> localTypes, Label startScope) {
         for (var s : stEn.stack()) {
             stackList.add(findTypeForStackMapInfo(s));
