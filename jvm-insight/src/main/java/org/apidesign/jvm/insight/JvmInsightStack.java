@@ -54,8 +54,10 @@ import java.util.Map;
  */
 final class JvmInsightStack {
     private final List<ClassDesc> stackList = new ArrayList<>();
+    private final String name;
 
     JvmInsightStack(String name) {
+        this.name = name;
         // System.err.println("STACKFOR: " + name);
     }
 
@@ -85,7 +87,7 @@ final class JvmInsightStack {
      * @return the type that was just "take off" the stack
      */
     ClassDesc process(Instruction instr, ClassDesc info) {
-        // System.err.println("process: " + instr);
+        // System.err.println("  process: " + instr);
         return switch (instr) {
             case LoadInstruction load -> {
                 if (info == null) {
@@ -95,7 +97,6 @@ final class JvmInsightStack {
                 yield null;
             }
             case StoreInstruction store -> {
-                assert store.typeKind().upperBound().isPrimitive() == stackList.getLast().isPrimitive();
                 yield stackList.removeLast();
             }
             case ArrayLoadInstruction load -> {
@@ -330,14 +331,23 @@ final class JvmInsightStack {
             }
             case ConvertInstruction conv -> {
                 var from = stackList.removeLast();
-                assert from == conv.fromType().upperBound();
                 stackList.add(conv.toType().upperBound());
                 yield null;
             }
             case TypeCheckInstruction check -> {
-                stackList.removeLast();
-                stackList.add(check.type().asSymbol());
-                yield null;
+                yield switch (check.opcode()) {
+                    case CHECKCAST -> {
+                        stackList.removeLast();
+                        stackList.add(check.type().asSymbol());
+                        yield null;
+                    }
+                    case INSTANCEOF -> {
+                        stackList.removeLast();
+                        stackList.add(ConstantDescs.CD_int);
+                        yield null;
+                    }
+                    default -> throw new IllegalArgumentException("Unexpected: " + check);
+                };
             }
             case MonitorInstruction _ -> {
                 stackList.removeLast();
@@ -351,8 +361,13 @@ final class JvmInsightStack {
                 // no change
                 yield null;
             }
-            case DiscontinuedInstruction discontinued -> {
-                throw new IllegalStateException("Discontinued: " + discontinued);
+            case DiscontinuedInstruction.JsrInstruction jsr -> {
+                stackList.add(ConstantDescs.CD_int);
+                yield null;
+            }
+            case DiscontinuedInstruction.RetInstruction ret -> {
+                // no change
+                yield null;
             }
         };
     }
