@@ -14,6 +14,7 @@
 package org.apidesign.jvm.insight;
 
 import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassTransform;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
@@ -83,7 +84,8 @@ final class JvmInsightAgent implements ClassFileTransformer {
             log("Transforming " + className);
             try {
                 var model = clazzFile.parse(classfileBuffer);
-                var newByteCode = clazzFile.transformClass(model, JvmInsightTransform.create(model));
+                var trans = JvmInsightTransform.create(model, ClassFile.latestMajorVersion(), ClassFile.latestMinorVersion());
+                var newByteCode = clazzFile.transformClass(model, trans);
                 return newByteCode;
             } catch (Throwable t) {
                 t.printStackTrace();

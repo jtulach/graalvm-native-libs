@@ -19,6 +19,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class AllAsmClassesTest {
     @ParameterizedTest(name = "transforming {0}")
@@ -29,18 +31,42 @@ public class AllAsmClassesTest {
 
         var cf = ClassFile.of();
         var model = cf.parse(bytes);
-        if (switch (model.thisClass().name().stringValue()) {
+        var jvmName = model.thisClass().name().stringValue();
+        if (switch (jvmName) {
             case "jdk3/ArtificialStructures" -> true;
             case "jdk8/AllFrames" -> true;
             default -> false;
         }) {
             return;
         }
-        var trans = JvmInsightTransform.create(model);
+        var trans = jvmName.startsWith("jdk3/") ?
+                JvmInsightTransform.create(model, -1, -1)
+                :
+                JvmInsightTransform.create(model, ClassFile.latestMajorVersion(), ClassFile.latestMinorVersion());
         try {
             var arr = cf.transformClass(model, trans);
 
             assertTrue(arr.length > bytes.length, "Processing of " + name + " yields " + arr.length + " bytes");
+
+            if (model.isModuleInfo() || jvmName.startsWith("jdk3/")) {
+                return;
+            }
+
+            var clazzName = jvmName.replace('/', '.');
+            var parent = new AvoidClassLoader(null);
+            var loader = new ClassLoader(parent) {
+                @Override
+                protected Class<?> findClass(String name) throws ClassNotFoundException {
+                    if (name.equals(clazzName)) {
+                        return defineClass(name, arr, 0, arr.length);
+                    } else {
+                        return null;
+                    }
+                }
+            };
+            var clazz = loader.loadClass(clazzName);
+            assertNotNull(clazz, "The " + clazzName + " is loaded");
+            assertEquals(clazz.getClassLoader(), loader, "Loaded by our class");
         } catch (Throwable t) {
             throw new AssertionError("Processing " + name, t);
         }

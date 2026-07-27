@@ -60,7 +60,8 @@ final class JvmInsightLoader extends URLClassLoader {
 
     private byte[] patch(byte[] arr) {
         var model = clazzFile.parse(arr);
-        return clazzFile.transformClass(model, JvmInsightTransform.create(model));
+        var trans = JvmInsightTransform.create(model, ClassFile.latestMajorVersion(), ClassFile.latestMinorVersion());
+        return clazzFile.transformClass(model, trans);
     }
 
     final JvmInsight getJvmInsight() {

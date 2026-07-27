@@ -17,6 +17,7 @@ import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassBuilder;
 import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassFileVersion;
 import java.lang.classfile.ClassModel;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.CodeBuilder;
@@ -50,14 +51,18 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
     private final ClassModel model;
     private final ClassDesc callbackClass;
     private boolean cinitDone;
+    private final int major;
+    private final int minor;
 
-    private JvmInsightTransform(ClassModel clazz) {
+    private JvmInsightTransform(ClassModel clazz, int major, int minor) {
         this.model = clazz;
+        this.major = major;
+        this.minor = minor;
         this.callbackClass = ClassDesc.of("java.util.function.Consumer");
     }
 
-    static ClassTransform create(ClassModel clazz) {
-        var jvm = new JvmInsightTransform(clazz);
+    static ClassTransform create(ClassModel clazz, int major, int minor) {
+        var jvm = new JvmInsightTransform(clazz, major, minor);
         var end = ClassTransform.endHandler(jvm);
         return jvm.andThen(end);
     }
@@ -80,7 +85,9 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
 
     @Override
     public void accept(ClassBuilder builder, ClassElement element) {
-        if (element instanceof MethodModel method) {
+        if (element instanceof ClassFileVersion && major != -1 && minor != -1) {
+            builder.withVersion(major, minor);
+        } else if (element instanceof MethodModel method) {
             builder.transformMethod(method, (mb, me) -> {
                 if (me instanceof CodeModel code) {
                     var opt = code.findAttribute(Attributes.localVariableTable());

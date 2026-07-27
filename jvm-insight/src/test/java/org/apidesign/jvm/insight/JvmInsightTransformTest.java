@@ -59,7 +59,7 @@ public class JvmInsightTransformTest {
         var arr = is.readAllBytes();
         var file = ClassFile.of();
         var model = file.parse(arr);
-        var transformer = JvmInsightTransform.create(model);
+        var transformer = JvmInsightTransform.create(model, ClassFile.latestMajorVersion(), ClassFile.latestMinorVersion());
         var data = file.transformClass(model, transformer);
         assertNotNull(data, "Some data generated");
     }
