@@ -180,7 +180,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 onHook("enter", "statements", method, line, argsNames, argsArr, cb);
                             }
                         };
-                        var stackList = new JvmInsightStack(method.methodName().stringValue());
+                        var stackList = new JvmInsightStack(method);
                         for (var instr : code.elementList()) {
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {
@@ -194,7 +194,8 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             if (instr instanceof LoadInstruction load) {
                                 var info = localTypes.get(load.slot());
                                 if (info == null) {
-                                    info = new VarInfo(null, load.slot(), ConstantDescs.CD_Object, null, null);
+                                    var type = load.typeKind().upperBound();
+                                    info = new VarInfo(null, load.slot(), type, null, null);
                                     localTypes.put(load.slot(), info);
                                 }
                                 locals.put(load.slot(), info);

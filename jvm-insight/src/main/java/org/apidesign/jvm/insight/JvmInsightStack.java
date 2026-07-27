@@ -15,6 +15,7 @@ package org.apidesign.jvm.insight;
 
 import java.lang.classfile.Instruction;
 import java.lang.classfile.Label;
+import java.lang.classfile.MethodModel;
 import java.lang.classfile.Opcode;
 import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.instruction.ArrayLoadInstruction;
@@ -48,6 +49,7 @@ import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /** Models JVM stack. Receives instructions and {@link Label}s and keeps
  * information about the types in the stack.
@@ -56,8 +58,8 @@ final class JvmInsightStack {
     private final List<ClassDesc> stackList = new ArrayList<>();
     private final String name;
 
-    JvmInsightStack(String name) {
-        this.name = name;
+    JvmInsightStack(MethodModel mm) {
+        this.name = mm.methodName().stringValue() + mm.methodType().stringValue();
         // System.err.println("STACKFOR: " + name);
     }
 
@@ -97,33 +99,33 @@ final class JvmInsightStack {
                 yield null;
             }
             case StoreInstruction store -> {
-                yield stackList.removeLast();
+                yield pop();
             }
             case ArrayLoadInstruction load -> {
-                stackList.removeLast();
-                stackList.removeLast();
+                pop();
+                pop();
                 stackList.add(load.typeKind().upperBound());
                 yield null;
             }
             case ArrayStoreInstruction _ -> {
-                stackList.removeLast();
-                stackList.removeLast();
-                stackList.removeLast();
+                pop();
+                pop();
+                pop();
                 yield null;
             }
             case FieldInstruction field -> {
                 yield switch (field.opcode()) {
                     case PUTFIELD -> {
-                        stackList.removeLast();
-                        stackList.removeLast();
+                        pop();
+                        pop();
                         yield null;
                     }
                     case PUTSTATIC -> {
-                        stackList.removeLast();
+                        pop();
                         yield null;
                     }
                     case GETFIELD -> {
-                        stackList.removeLast();
+                        pop();
                         stackList.add(field.typeSymbol());
                         yield null;
                     }
@@ -144,7 +146,7 @@ final class JvmInsightStack {
             }
             case NewReferenceArrayInstruction newa -> {
                 var type = newa.componentType().asSymbol().arrayType();
-                var count = stackList.removeLast();
+                var count = pop();
                 assert count == ConstantDescs.CD_int;
                 stackList.add(type);
                 yield null;
@@ -160,7 +162,7 @@ final class JvmInsightStack {
             }
             case NewPrimitiveArrayInstruction newp -> {
                 var type = newp.typeKind().upperBound();
-                var count = stackList.removeLast();
+                var count = pop();
                 assert count == ConstantDescs.CD_int;
                 stackList.add(type);
                 yield null;
@@ -180,31 +182,31 @@ final class JvmInsightStack {
                     default -> false;
                 };
                 if (!unary) {
-                    stackList.removeLast();
+                    pop();
                 }
-                stackList.removeLast();
+                pop();
                 stackList.add(op.typeKind().upperBound());
                 yield null;
             }
             case StackInstruction stack -> {
                 switch (stack.opcode()) {
-                    case Opcode.POP -> stackList.removeLast();
+                    case Opcode.POP -> pop();
                     case Opcode.POP2 -> {
-                        var value1 = stackList.removeLast();
+                        var value1 = pop();
                         if (!isCategory2(value1)) {
-                            stackList.removeLast();
+                            pop();
                         }
                     }
                     case Opcode.DUP -> {
                         stackList.add(stackList.getLast());
                     }
                     case Opcode.DUP2 -> {
-                        var value1 = stackList.removeLast();
+                        var value1 = pop();
                         if (isCategory2(value1)) {
                             stackList.add(value1);
                             stackList.add(value1);
                         } else {
-                            var value2 = stackList.removeLast();
+                            var value2 = pop();
                             stackList.add(value2);
                             stackList.add(value1);
                             stackList.add(value2);
@@ -213,21 +215,21 @@ final class JvmInsightStack {
                     }
 
                     case Opcode.DUP_X1 -> {
-                        var value1 = stackList.removeLast();
-                        var value2 = stackList.removeLast();
+                        var value1 = pop();
+                        var value2 = pop();
                         stackList.add(value1);
                         stackList.add(value2);
                         stackList.add(value1);
                     }
                     case Opcode.DUP_X2 -> {
-                        var value1 = stackList.removeLast();
-                        var value2 = stackList.removeLast();
-                        if (isCategory2(value1)) {
+                        var value1 = pop();
+                        var value2 = pop();
+                        if (isCategory2(value1) || isCategory2(value2)) {
                             stackList.add(value1);
                             stackList.add(value2);
                             stackList.add(value1);
                         } else {
-                            var value3 = stackList.removeLast();
+                            var value3 = pop();
                             stackList.add(value1);
                             stackList.add(value3);
                             stackList.add(value2);
@@ -235,14 +237,14 @@ final class JvmInsightStack {
                         }
                     }
                     case Opcode.DUP2_X1 -> {
-                        var value1 = stackList.removeLast();
-                        var value2 = stackList.removeLast();
+                        var value1 = pop();
+                        var value2 = pop();
                         if (isCategory2(value1)) {
                             stackList.add(value1);
                             stackList.add(value2);
                             stackList.add(value1);
                         } else {
-                            var value3 = stackList.removeLast();
+                            var value3 = pop();
                             stackList.add(value2);
                             stackList.add(value1);
                             stackList.add(value3);
@@ -251,12 +253,12 @@ final class JvmInsightStack {
                         }
                     }
                     case Opcode.DUP2_X2 -> {
-                        var value1 = stackList.removeLast();
-                        var value2 = stackList.removeLast();
+                        var value1 = pop();
+                        var value2 = pop();
                         if (!isCategory2(value1) && !isCategory2(value2)) {
                             // form 1
-                            var value3 = stackList.removeLast();
-                            var value4 = stackList.removeLast();
+                            var value3 = pop();
+                            var value4 = pop();
                             stackList.add(value2);
                             stackList.add(value1);
                             stackList.add(value4);
@@ -269,7 +271,7 @@ final class JvmInsightStack {
                             stackList.add(value2);
                             stackList.add(value1);
                         } else {
-                            var value3 = stackList.removeLast();
+                            var value3 = pop();
                             if (isCategory2(value3)) {
                                 // form 3
                                 stackList.add(value2);
@@ -297,21 +299,21 @@ final class JvmInsightStack {
             case BranchInstruction branch -> {
                 yield switch (branch.opcode()) {
                     case IF_ACMPEQ, IF_ACMPNE -> {
-                        stackList.removeLast();
-                        stackList.removeLast();
+                        pop();
+                        pop();
                         yield null;
                     }
                     case IFEQ, IFNE, IFLT, IFGE, IFGT, IFLE -> {
-                        stackList.removeLast();
+                        pop();
                         yield null;
                     }
                     case IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPGE, IF_ICMPGT, IF_ICMPLE -> {
-                        stackList.removeLast();
-                        stackList.removeLast();
+                        pop();
+                        pop();
                         yield null;
                     }
                     case IFNULL, IFNONNULL -> {
-                        stackList.removeLast();
+                        pop();
                         yield null;
                     }
                     case GOTO, GOTO_W -> {
@@ -326,23 +328,23 @@ final class JvmInsightStack {
                 yield null;
             }
             case ThrowInstruction _ -> {
-                stackList.removeLast();
+                pop();
                 yield null;
             }
             case ConvertInstruction conv -> {
-                var from = stackList.removeLast();
+                var from = pop();
                 stackList.add(conv.toType().upperBound());
                 yield null;
             }
             case TypeCheckInstruction check -> {
                 yield switch (check.opcode()) {
                     case CHECKCAST -> {
-                        stackList.removeLast();
+                        pop();
                         stackList.add(check.type().asSymbol());
                         yield null;
                     }
                     case INSTANCEOF -> {
-                        stackList.removeLast();
+                        pop();
                         stackList.add(ConstantDescs.CD_int);
                         yield null;
                     }
@@ -350,11 +352,11 @@ final class JvmInsightStack {
                 };
             }
             case MonitorInstruction _ -> {
-                stackList.removeLast();
+                pop();
                 yield null;
             }
             case TableSwitchInstruction _, LookupSwitchInstruction _ -> {
-                stackList.removeLast();
+                pop();
                 yield null;
             }
             case IncrementInstruction _, NopInstruction _ -> {
@@ -424,5 +426,14 @@ final class JvmInsightStack {
 
     private void ignoring(Instruction instr) {
         // System.err.println("ignoring stack instruction " + instr);
+    }
+
+    private ClassDesc pop() {
+        try {
+            return stackList.removeLast();
+        } catch (NoSuchElementException ex) {
+            assert false : "Stack underflow in " + name;
+            return ConstantDescs.CD_Object;
+        }
     }
 }

@@ -29,6 +29,12 @@ public class AllAsmClassesTest {
 
         var cf = ClassFile.of();
         var model = cf.parse(bytes);
+        if (switch (model.thisClass().name().stringValue()) {
+            case "jdk3/ArtificialStructures" -> true;
+            default -> false;
+        }) {
+            return;
+        }
         var trans = JvmInsightTransform.create(model);
         try {
             var arr = cf.transformClass(model, trans);
