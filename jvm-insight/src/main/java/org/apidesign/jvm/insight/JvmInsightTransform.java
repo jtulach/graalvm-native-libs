@@ -26,8 +26,6 @@ import java.lang.classfile.MethodModel;
 import java.lang.classfile.Opcode;
 import java.lang.classfile.TypeKind;
 import java.lang.classfile.attribute.LocalVariableInfo;
-import java.lang.classfile.attribute.LocalVariableTableAttribute;
-import java.lang.classfile.attribute.StackMapFrameInfo;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
@@ -43,10 +41,8 @@ import java.lang.constant.DirectMethodHandleDesc;
 import java.lang.constant.DynamicCallSiteDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.AccessFlag;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 
@@ -187,7 +183,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                             }
                         };
                         // System.err.println("method: " + method.methodName().stringValue());
-                        var stackList = new ArrayList<ClassDesc>();
+                        var stackList = new JvmInsightStack();
                         for (var instr : code.elementList()) {
                             // System.err.println("  instr: " + instr);
                             if (instr instanceof LocalVariableInfo localVar) {
@@ -207,7 +203,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 locals.put(load.slot(), info);
                                 if (load.slot() > 0 || method.flags().has(AccessFlag.STATIC)) {
                                     var type = info.typeSymbol();
-                                    stackList.add(type);
+                                    stackList.push(type);
                                     loadFromArray(cb, argsArr, type, load.slot());
                                     continue;
                                 }
@@ -229,7 +225,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                     var info = localTypes.get(store.slot());
                                     if (info == null) {
                                         // read from the stack
-                                        var fromStack = stackList.removeLast();
+                                        var fromStack = stackList.pop();
                                         info = new VarInfo(null, store.slot(), fromStack, null, null);
                                         localTypes.put(store.slot(), info);
                                     }
@@ -254,12 +250,12 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
 
                             if (instr instanceof FieldInstruction field) {
                                 if (field.opcode() == Opcode.GETSTATIC || field.opcode() == Opcode.GETFIELD) {
-                                    stackList.add(field.typeSymbol());
+                                    stackList.push(field.typeSymbol());
                                 }
                             }
 
                             if (instr instanceof InvokeInstruction invoke) {
-                                stackList.add(invoke.typeSymbol().returnType());
+                                stackList.push(invoke.typeSymbol().returnType());
                             }
 
                             if (instr instanceof Label label) {
@@ -271,24 +267,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
                                 if (optStack.isPresent()) {
                                     for (var stEn : optStack.get().entries()) {
                                         if (stEn.target() == label) {
-                                            // System.err.println("found entry: " + stEn);
-                                            stackList.clear();
-                                            for (var s : stEn.stack()) {
-                                                stackList.add(findTypeForStackMapInfo(s));
-                                            }
-                                            // System.err.println("  with stack : " + stackList);
-                                            var cnt = 0;
-                                            for (var verify : stEn.locals()) {
-                                                var type = findTypeForStackMapInfo(verify);
-                                                var prev = localTypes.get(cnt);
-                                                var info = new VarInfo(
-                                                    prev == null ? null : prev.name(),
-                                                    cnt, type, label,
-                                                    prev == null ? null : prev.endScope()
-                                                );
-                                                localTypes.put(cnt, info);
-                                                cnt++;
-                                            }
+                                            stackList.refresh(stEn, localTypes, label);
                                         }
                                     }
                                 }
@@ -355,7 +334,7 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
         }
     }
 
-    private record VarInfo(String name, int slot, ClassDesc typeSymbol, Label startScope, Label endScope) {
+    record VarInfo(String name, int slot, ClassDesc typeSymbol, Label startScope, Label endScope) {
         VarInfo(LocalVariableInfo localVar) {
             this(
                 localVar.name().stringValue(), localVar.slot(), localVar.typeSymbol(),
@@ -572,37 +551,5 @@ final class JvmInsightTransform implements ClassTransform, Consumer<ClassBuilder
         cb.pop();
 
         cb.arrayStore(TypeKind.REFERENCE);
-    }
-
-    private ClassDesc findTypeForStackMapInfo(StackMapFrameInfo.VerificationTypeInfo verify) {
-        return switch (verify) {
-            case StackMapFrameInfo.ObjectVerificationTypeInfo obj -> {
-                yield obj.classSymbol();
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.DOUBLE -> {
-                yield ConstantDescs.CD_double;
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.FLOAT -> {
-                yield ConstantDescs.CD_float;
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.INTEGER -> {
-                yield ConstantDescs.CD_int;
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.LONG -> {
-                yield ConstantDescs.CD_long;
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.TOP -> {
-                yield ConstantDescs.CD_Object;
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.NULL -> {
-                yield ConstantDescs.CD_Object;
-            }
-            case StackMapFrameInfo.SimpleVerificationTypeInfo.UNINITIALIZED_THIS -> {
-                yield ConstantDescs.CD_Object;
-            }
-            case StackMapFrameInfo.UninitializedVerificationTypeInfo noInit -> {
-                yield ConstantDescs.CD_Object;
-            }
-        };
     }
 }
