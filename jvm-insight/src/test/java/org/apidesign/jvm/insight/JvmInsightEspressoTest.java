@@ -16,6 +16,9 @@ package org.apidesign.jvm.insight;
 import org.apidesign.jvm.insight.samples.Factorial;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.lang.classfile.ClassElement;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.MethodModel;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.LinkedHashMap;
@@ -23,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -39,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -56,12 +61,12 @@ public final class JvmInsightEspressoTest {
      * GraalVM Insight out of the box, there is no special configuration to
      * do to make the class GraalVM Insight capable.
      */
-    private static Value Factorial;
+    private Value Factorial;
     /** The {@link Factorial} class must be loaded by different classloader.
      * That classloader patches the bytecode of the loaded classes to be
      * {@link JvmInsight} capable.
      */
-    private static ClassLoader loader;
+    private ClassLoader loader;
 
     public JvmInsightEspressoTest() {
     }
@@ -83,8 +88,14 @@ public final class JvmInsightEspressoTest {
                 .allowNativeAccess(true);
         ctx = b.build();
         ctx.enter();
+    }
+
+    @BeforeEach
+    public void loadEspressoClass() throws Exception {
         Factorial = ctx.getBindings("java").getMember("org.apidesign.jvm.insight.samples.Factorial");
         assertNotNull(Factorial, "Class is found");
+        var warmUp = Factorial.invokeMember("fac", 6);
+        assertEquals(warmUp.asInt(), 720);
     }
 
     @BeforeEach
@@ -97,21 +108,21 @@ public final class JvmInsightEspressoTest {
         loader = JvmInsight.createLoader(new AvoidClassLoader(Factorial.class.getClassLoader()), bothCp);
     }
 
+    @AfterAll
+    public static void disposeContext() {
+        ctx.close();
+    }
+
     /** This is the {@link Factorial} class loaded by different classloader.
      * That classloader patches the bytecode of the loaded classes to be
      * {@link JvmInsight} capable. As the class is loaded by different classloader
      * that this testing class, we have to access it via reflection.
      */
-    private static Class<?> FactorialHosted() throws ClassNotFoundException {
+    private Class<?> FactorialHosted() throws ClassNotFoundException {
         var FactorialHosted = loader.loadClass(Factorial.class.getName());
         assertNotEquals(Factorial.class, FactorialHosted, "Factorial shall be masked from this loader");
         assertNotNull(FactorialHosted, "Factorial class is loaded");
         return FactorialHosted;
-    }
-
-    @AfterAll
-    public static void disposeContext() {
-        ctx.close();
     }
 
     @BeforeEach
@@ -121,20 +132,49 @@ public final class JvmInsightEspressoTest {
 
     @ParameterizedTest
     @EnumSource(JvmType.class)
+    public void invokeFactorialWithMethodFqn(JvmType jvm) throws Exception {
+        if (jvm == JvmType.ESPRESSO) {
+            return;
+        }
+        var insight = """
+            insight.on('enter', (ctx, frame) => {
+                print(`Invoked ${ctx.name} with n=${frame.n}`);
+            }, {
+                roots : true,
+                rootNameFilter : 'Lorg/apidesign/jvm/insight/samples/Factorial;\\.fac\\\\(I\\\\)I'
+            });
+            """;
+        try (
+            var _ = jvm.applyInsight(this, insight, "print-n.js")
+        ) {
+            var res = jvm.invokeFactorialMethodLong(this, "fac", 5);
+            assertEquals(120, res);
+        }
+
+        assertEquals("""
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=5
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=4
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=3
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=2
+        Invoked Lorg/apidesign/jvm/insight/samples/Factorial;.fac(I)I with n=1
+        """, out.toString(), "Properly captured five invocation of fac(n)");
+    }
+
+    @ParameterizedTest
+    @EnumSource(JvmType.class)
     public void invokeFactorialWithInsights(JvmType jvm) throws Exception {
         var insight = """
             insight.on('enter', (ctx, frame) => {
                 print(`Invoked ${ctx.name} with n=${frame.n}`);
-                debugger;
             }, {
                 roots : true,
                 rootNameFilter : '.*fac.*'
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "print-n.js")
+            var _ = jvm.applyInsight(this, insight, "print-n.js")
         ) {
-            var res = jvm.invokeFactorialMethodLong("fac", 5);
+            var res = jvm.invokeFactorialMethodLong(this, "fac", 5);
             assertEquals(120, res);
         }
 
@@ -159,9 +199,9 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "print-sum.js")
+            var _ = jvm.applyInsight(this, insight, "print-sum.js")
         ) {
-            var res = jvm.invokeFactorialMethodLong("simpleFac", 5);
+            var res = jvm.invokeFactorialMethodLong(this, "simpleFac", 5);
             assertEquals(120, res);
         }
 
@@ -182,9 +222,9 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "print-lines.js")
+            var _ = jvm.applyInsight(this, insight, "print-lines.js")
         ) {
-            var res = jvm.invokeFactorialMethodLong("fac", 5);
+            var res = jvm.invokeFactorialMethodLong(this, "fac", 5);
             assertEquals(120, res);
         }
 
@@ -218,9 +258,9 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "print-lines.js")
+            var _ = jvm.applyInsight(this, insight, "print-lines.js")
         ) {
-            var res = jvm.invokeFactorialMethodLong("fac", 5);
+            var res = jvm.invokeFactorialMethodLong(this, "fac", 5);
             assertEquals(120, res);
         }
 
@@ -248,9 +288,9 @@ public final class JvmInsightEspressoTest {
             """;
         long len;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "all-types.js")
+            var _ = jvm.applyInsight(this, insight, "all-types.js")
         ) {
-            len = jvm.invokeFactorialMethodLong("allTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
+            len = jvm.invokeFactorialMethodLong(this, "allTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
         }
 
         var exp = Set.of(
@@ -286,9 +326,9 @@ public final class JvmInsightEspressoTest {
             """;
         long len;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "all-types.js")
+            var _ = jvm.applyInsight(this, insight, "all-types.js")
         ) {
-            len = jvm.invokeFactorialInstanceMethodLong("allInstanceTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
+            len = jvm.invokeFactorialInstanceMethodLong(this, "allInstanceTypes", "", false, (byte) 0x04, (short)32, 48, 6354L, 'X', 0.5f, 2.7);
         }
 
         var exp = Set.of(
@@ -316,9 +356,9 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "change-locals.js")
+            var _ = jvm.applyInsight(this, insight, "change-locals.js")
         ) {
-            var sixSeven= jvm.invokeFactorialMethodLong("mul", 5, 3);
+            var sixSeven= jvm.invokeFactorialMethodLong(this, "mul", 5, 3);
             assertEquals(42, sixSeven, "6 * 7 = 42");
         }
     }
@@ -359,9 +399,9 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "step-over.js")
+            var _ = jvm.applyInsight(this, insight, "step-over.js")
         ) {
-            var hi= jvm.invokeFactorialMethod(String.class, "simpleConcat", "Hi", "There!");
+            var hi= jvm.invokeFactorialMethod(this, String.class, "simpleConcat", "Hi", "There!");
             assertEquals("HiThere!", hi);
         }
         assertEquals("""
@@ -392,9 +432,9 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "countDown.js")
+            var _ = jvm.applyInsight(this, insight, "countDown.js")
         ) {
-            jvm.invokeFactorialMethodLong("countDown", 10);
+            jvm.invokeFactorialMethodLong(this, "countDown", 10);
         } catch (IllegalArgumentException ex) {
             assertEquals("Count down", ex.getMessage());
         } catch (PolyglotException ex) {
@@ -435,11 +475,11 @@ public final class JvmInsightEspressoTest {
             });
             """;
         try (
-            var _ = jvm.applyInsight(ctx, insight, "dumpArgs.js")
+            var _ = jvm.applyInsight(this, insight, "dumpArgs.js")
         ) {
-            var array = jvm.invokeFactorialMethod(Object.class, "fourElementArray");
-            var noAction = jvm.invokeFactorialMethod(Object.class, "noAction");
-            jvm.invokeFactorialMethod(String.class, "forEach", array, noAction);
+            var array = jvm.invokeFactorialMethod(this, Object.class, "fourElementArray");
+            var noAction = jvm.invokeFactorialMethod(this, Object.class, "noAction");
+            jvm.invokeFactorialMethod(this, String.class, "forEach", array, noAction);
         }
         assertEquals("""
             forEach:2 3 5 8""",
@@ -448,14 +488,15 @@ public final class JvmInsightEspressoTest {
         );
     }
 
-
     public enum JvmType {
         ESPRESSO, JVM;
 
         public static final class Insight {
-
+            private final ClassLoader loader;
             private AutoCloseable handle;
-            private Insight() {
+
+            private Insight(ClassLoader loader) {
+                this.loader = loader;
             }
 
             public static class Ctx {
@@ -476,27 +517,25 @@ public final class JvmInsightEspressoTest {
                 var filter = (String) cfg.get("rootNameFilter");
                 var rootNameFilter = filter == null ? null : Pattern.compile(filter);
                 final BiConsumer<JvmInsight.At, Map<String, Object>> handler = (var at, var frame) -> {
-                    var where = at.toString();
-                    var lineSep = where.indexOf(':');
-                    var line = Integer.parseInt(where.substring(0, lineSep));
-                    var methodName = where.substring(lineSep + 1);
-                    if (rootNameFilter == null || rootNameFilter.matcher(methodName).matches()) {
-                        var ctx = new Ctx(methodName, line);
-                        var txtFrame = new LinkedHashMap<String, Object>();
-                        var needsTxtFrame = false;
-                        for (var en : frame.entrySet()) {
-                            if (en.getValue() instanceof StringBuilder sb) {
-                                needsTxtFrame = true;
-                                txtFrame.put(en.getKey(), sb.toString());
-                            } else {
-                                txtFrame.put(en.getKey(), en.getValue());
-                            }
+                    var line = at.line();
+                    var methodName = at.method().toString();
+                    var ctx = new Ctx(methodName, line);
+                    var txtFrame = new LinkedHashMap<String, Object>();
+                    var needsTxtFrame = false;
+                    for (var en : frame.entrySet()) {
+                        if (en.getValue() instanceof StringBuilder sb) {
+                            needsTxtFrame = true;
+                            txtFrame.put(en.getKey(), sb.toString());
+                        } else {
+                            txtFrame.put(en.getKey(), en.getValue());
                         }
-                        fn.apply(ctx, needsTxtFrame ? txtFrame : frame);
                     }
+                    fn.apply(ctx, needsTxtFrame ? txtFrame : frame);
                 };
                 var jvmInsight = JvmInsight.find(loader);
-                handle = jvmInsight.configure((_) -> true, (bldr) -> {
+                handle = jvmInsight.configure((info) -> {
+                    return rootNameFilter == null ? true : findAnyMethod(info.classModel(), rootNameFilter);
+                }, (bldr) -> {
                     switch (type) {
                         case "enter" -> bldr.when(JvmInsight.When.ENTER);
                         case "return" -> bldr.when(JvmInsight.When.RETURN);
@@ -508,12 +547,18 @@ public final class JvmInsightEspressoTest {
                     if (Boolean.TRUE.equals(cfg.get("statements"))) {
                         bldr.statements(true);
                     }
+                    if (rootNameFilter != null) {
+                        bldr.methods((info) -> {
+                           var m = rootNameFilter.matcher(info.toString());
+                           return m.matches();
+                        });
+                    }
                     bldr.call(handler);
                 });
             }
         }
 
-        final AutoCloseable applyInsight(Context ctx, String code, String name)
+        final AutoCloseable applyInsight(JvmInsightEspressoTest self, String code, String name)
                 throws Exception {
             if (this == JVM) {
                 var init = Source.newBuilder("js", """
@@ -523,14 +568,14 @@ public final class JvmInsightEspressoTest {
                     }
                 })
                 """, "init.js").build();
-                var initFn = ctx.eval(init);
-                var jvmInsight = new Insight();
+                var initFn = self.ctx.eval(init);
+                var jvmInsight = new Insight(self.loader);
                 var evalFn = initFn.execute(jvmInsight);
                 evalFn.executeVoid(code);
 
                 return jvmInsight.handle;
             } else {
-                var engine = ctx.getEngine();
+                var engine = self.ctx.getEngine();
 
                 var insight = engine.getInstruments().get("insight");
                 assertNotNull(insight, "There must be the insight instrument");
@@ -544,12 +589,12 @@ public final class JvmInsightEspressoTest {
             }
         }
 
-        final long invokeFactorialMethodLong(String name, Object... args) throws Exception {
+        final long invokeFactorialMethodLong(JvmInsightEspressoTest self, String name, Object... args) throws Exception {
             return switch (this) {
-                case ESPRESSO -> Factorial.invokeMember(name, args).asLong();
+                case ESPRESSO -> self.Factorial.invokeMember(name, args).asLong();
                 case JVM -> {
                     try {
-                        for (var m : FactorialHosted().getMethods()) {
+                        for (var m : self.FactorialHosted().getMethods()) {
                             if (!m.getName().equals(name)) {
                                 continue;
                             }
@@ -568,12 +613,12 @@ public final class JvmInsightEspressoTest {
             };
         }
 
-        final <T> T invokeFactorialMethod(Class<T> resultType, String name, Object... args) {
+        final <T> T invokeFactorialMethod(JvmInsightEspressoTest self, Class<T> resultType, String name, Object... args) {
             return switch (this) {
-                case ESPRESSO -> Factorial.invokeMember(name, args).as(resultType);
+                case ESPRESSO -> self.Factorial.invokeMember(name, args).as(resultType);
                 case JVM -> {
                     try {
-                        for (var m : FactorialHosted().getMethods()) {
+                        for (var m : self.FactorialHosted().getMethods()) {
                             if (!m.getName().equals(name)) {
                                 continue;
                             }
@@ -588,16 +633,16 @@ public final class JvmInsightEspressoTest {
             };
         }
 
-        final long invokeFactorialInstanceMethodLong(String name, Object... args) {
+        final long invokeFactorialInstanceMethodLong(JvmInsightEspressoTest self, String name, Object... args) {
             return switch (this) {
                 case ESPRESSO -> {
-                    var inst = Factorial.newInstance();
+                    var inst = self.Factorial.newInstance();
                     yield inst.invokeMember(name, args).asLong();
                 }
                 case JVM -> {
                     try {
-                        var inst = FactorialHosted().getConstructor().newInstance();
-                        for (var m : FactorialHosted().getMethods()) {
+                        var inst = self.FactorialHosted().getConstructor().newInstance();
+                        for (var m : self.FactorialHosted().getMethods()) {
                             if (!m.getName().equals(name)) {
                                 continue;
                             }
@@ -613,4 +658,25 @@ public final class JvmInsightEspressoTest {
         }
     }
 
+    /**
+     * Checks whether any method name in the {@code cm} model matches the
+     * provided {@code filter}.
+     *
+     * @param cm model of the class
+     * @param filter filter to check the method name against
+     * @return {@code true} if any method name matches
+     */
+    private static boolean findAnyMethod(ClassModel cm, Pattern filter) {
+        var jvmTypeName = cm.thisClass().asInternalName();
+        var methods = cm.elementStream().mapMulti((ClassElement e, Consumer<MethodModel> sink) -> {
+            if (e instanceof MethodModel method) {
+                sink.accept(method);
+            }
+        });
+        var properlyNamedMethods = methods.filter(method -> {
+            var fqn = "L" + jvmTypeName + ";." + method.methodName().stringValue() + method.methodType().stringValue();
+            return filter.matcher(fqn).matches();
+        });
+        return properlyNamedMethods.findAny().isPresent();
+    }
 }

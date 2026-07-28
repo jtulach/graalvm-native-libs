@@ -41,10 +41,9 @@ final class JvmInsightLoader extends URLClassLoader {
         }
         try {
             var arr = is.readAllBytes();
-            var info = new JvmInsight.ClassInfo(name, null, this);
+            var info = new JvmInsight.ClassInfo(name, null, this, arr);
             var newArr = info.instrumentClass(jvmInsight) ?
-                    patch(arr) :
-                    arr;
+                    patch(info) : arr;
             /* Enable and inspect with javap -c -private * /
             try (
                 var os = new java.io.FileOutputStream(new java.io.File("/tmp/Clazz.class"))
@@ -58,8 +57,8 @@ final class JvmInsightLoader extends URLClassLoader {
         }
     }
 
-    private byte[] patch(byte[] arr) {
-        var model = clazzFile.parse(arr);
+    private byte[] patch(JvmInsight.ClassInfo info) {
+        var model = info.classModel();
         var trans = JvmInsightTransform.create(model, ClassFile.latestMajorVersion(), ClassFile.latestMinorVersion());
         return clazzFile.transformClass(model, trans);
     }

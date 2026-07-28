@@ -13,6 +13,8 @@
  */
 package org.apidesign.jvm.insight;
 
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
@@ -110,11 +112,14 @@ public final class JvmInsight  {
         private final String name;
         private final Module module;
         private final ClassLoader loader;
+        private final byte[] code;
+        private ClassModel model;
 
-        ClassInfo(String name, Module module, ClassLoader loader) {
+        ClassInfo(String name, Module module, ClassLoader loader, byte[] code) {
             this.name = name.replace('.', '/');
             this.module = module;
             this.loader = loader;
+            this.code = code;
         }
 
         /** Fully qualified name with dots. E.g. {@code java.lang.String}.
@@ -168,6 +173,19 @@ public final class JvmInsight  {
             return name.subSequence(start, end);
         }
 
+        /**
+         * Model of the class that's about to be loaded.
+         *
+         * @return the parsed model of the class
+         */
+        public ClassModel classModel() {
+            if (model == null) {
+                var file = ClassFile.of();
+                model = file.parse(code);
+            }
+            return model;
+        }
+
         /** Check whether a class to be loaded shall be patched.
          *
          * @return true if this class should be instrumented at least by
@@ -216,8 +234,6 @@ public final class JvmInsight  {
             }
             return Objects.equals(this.loader, other.loader);
         }
-
-
     }
 
     /** Info about a method being defined. In addition to providing various
@@ -546,7 +562,7 @@ public final class JvmInsight  {
                 )
             );
             var info = new ClassInfo(
-                clazz.getName(), clazz.getModule(), clazz.getClassLoader()
+                clazz.getName(), clazz.getModule(), clazz.getClassLoader(), null
             );
             var method = new MethodInfo(info, methodName, methodDescriptor);
             var at = new At(
