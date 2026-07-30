@@ -29,6 +29,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import org.apidesign.jvm.insight.JvmInsight.ClassInfo;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
@@ -534,7 +535,7 @@ public final class JvmInsightEspressoTest {
                 };
                 var jvmInsight = JvmInsight.find(loader);
                 handle = jvmInsight.configure((info) -> {
-                    return rootNameFilter == null ? true : findAnyMethod(info.classModel(), rootNameFilter);
+                    return rootNameFilter == null ? true : findAnyMethod(info, rootNameFilter);
                 }, (bldr) -> {
                     switch (type) {
                         case "enter" -> bldr.when(JvmInsight.When.ENTER);
@@ -666,17 +667,12 @@ public final class JvmInsightEspressoTest {
      * @param filter filter to check the method name against
      * @return {@code true} if any method name matches
      */
-    private static boolean findAnyMethod(ClassModel cm, Pattern filter) {
-        var jvmTypeName = cm.thisClass().asInternalName();
-        var methods = cm.elementStream().mapMulti((ClassElement e, Consumer<MethodModel> sink) -> {
-            if (e instanceof MethodModel method) {
-                sink.accept(method);
+    private static boolean findAnyMethod(ClassInfo info, Pattern filter) {
+        for (var method : info) {
+            if (filter.matcher(method).matches()) {
+                return true;
             }
-        });
-        var properlyNamedMethods = methods.filter(method -> {
-            var fqn = "L" + jvmTypeName + ";." + method.methodName().stringValue() + method.methodType().stringValue();
-            return filter.matcher(fqn).matches();
-        });
-        return properlyNamedMethods.findAny().isPresent();
+        }
+        return false;
     }
 }

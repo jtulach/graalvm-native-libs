@@ -13,14 +13,17 @@
  */
 package org.apidesign.jvm.insight;
 
+import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
+import java.lang.classfile.MethodModel;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +111,7 @@ public final class JvmInsight  {
      * representing the same content of {@link #name()}, so filters
      * can work with generic type when just a name is enough to filter.
      */
-    public final static class ClassInfo implements CharSequence {
+    public final static class ClassInfo implements CharSequence, Iterable<MethodInfo> {
         private final String name;
         private final Module module;
         private final ClassLoader loader;
@@ -174,11 +177,26 @@ public final class JvmInsight  {
         }
 
         /**
-         * Model of the class that's about to be loaded.
+         * Iterator over all {@link MethodInfo} elements provided by this class.
          *
          * @return the parsed model of the class
          */
-        public ClassModel classModel() {
+        @Override
+        public Iterator<MethodInfo> iterator() {
+            var models = classModel().elementStream().mapMulti((ClassElement t, Consumer<MethodModel> sink) -> {
+                if (t instanceof MethodModel m) {
+                    sink.accept(m);
+                }
+            });
+            var infos = models.map(e -> {
+                var methodName = e.methodName().stringValue();
+                var descriptor = e.methodType().stringValue();
+                return new MethodInfo(this, methodName, descriptor);
+            });
+            return infos.iterator();
+        }
+
+        final ClassModel classModel() {
             if (model == null) {
                 var file = ClassFile.of();
                 model = file.parse(code);
@@ -279,6 +297,14 @@ public final class JvmInsight  {
             return descriptor;
         }
 
+        /** Fully qualified name of the method.
+         * Includes the {@link ClassInfo#jvmName()} of the class,
+         * the method {@link MethodInfo#name()} and the {@link MethodInfo#descriptor()}.
+         * For example method {@link String#length()}
+         * would be represented as {@code "Ljava/lang/String;.length()I"} string.
+         *
+         * @return fully qualified name identifying the method
+         */
         @Override
         public String toString() {
             return "L" + clazz().jvmName() + ";." + name() + descriptor();
