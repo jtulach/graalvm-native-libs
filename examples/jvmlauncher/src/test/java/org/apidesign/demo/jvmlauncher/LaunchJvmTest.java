@@ -80,7 +80,7 @@ public class LaunchJvmTest {
                 output.append(line);
             }
         }
-        var warns = output.indexOf("java.lang.ClassNotFoundException: Class not found org/apidesign/demo/jvmlauncher/LaunchJvm") >= 0;
+        var warns = output.indexOf("java.lang.ClassNotFoundException: org/apidesign/demo/jvmlauncher/LaunchJvm") >= 0;
         assertTrue(warns, "Expecting exception: " + output);
     }
 

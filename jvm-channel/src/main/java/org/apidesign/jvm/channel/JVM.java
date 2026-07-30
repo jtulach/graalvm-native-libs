@@ -113,7 +113,7 @@ public final class JVM {
             var fn = e.getFunctions();
             var mainClazz = fn.getFindClass().call(e, className.get());
             if (mainClazz.isNull()) {
-                throw new ClassNotFoundException("Class not found " + classNameWithSlashes);
+                throw new ClassNotFoundException(classNameWithSlashes);
             }
             var mainMethod = fn.getGetStaticMethodID().call(e, mainClazz, mainName.get(), mainSig.get());
             if (mainMethod.isNull()) {
