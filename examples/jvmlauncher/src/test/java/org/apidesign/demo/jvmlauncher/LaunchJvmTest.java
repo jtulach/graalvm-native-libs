@@ -60,6 +60,30 @@ public class LaunchJvmTest {
         assertTrue(openJDK || hotSpot, "Expecting HotSpot VM, but was: " + output);
     }
 
+    @Test
+    public void executeNativeExeWithBrokenClasspath() throws Exception {
+        var pb = new ProcessBuilder(prog.getAbsolutePath(), "--jvm");
+        pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
+        pb.environment().put("CP", "broken_class_path");
+        var proc = pb.start();
+        assertEquals(1, proc.waitFor(), "Executing " + prog + " fails");
+        var output = new StringBuilder();
+        try (var r = new BufferedReader(new InputStreamReader(proc.getErrorStream()))) {
+            for (;;) {
+                var line = r.readLine();
+                if (line == null) {
+                    break;
+                }
+                if (output.length() > 0) {
+                    output.append("\n");
+                }
+                output.append(line);
+            }
+        }
+        var warns = output.indexOf("java.lang.ClassNotFoundException: org/apidesign/demo/jvmlauncher/LaunchJvm") >= 0;
+        assertTrue(warns, "Expecting exception: " + output);
+    }
+
     private static String executeProg(String... args) throws IOException, InterruptedException {
         var pb = new ProcessBuilder(args);
         pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
