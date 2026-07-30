@@ -19,7 +19,7 @@ import java.util.Arrays;
 import org.apidesign.jvm.channel.JVM;
 
 public final class LaunchJvm {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws ClassNotFoundException {
         var argList = new ArrayList<>(Arrays.asList(args));
         var argJvmAt = argList.indexOf("--jvm");
         if (argJvmAt >= 0) {
@@ -31,7 +31,11 @@ public final class LaunchJvm {
             var javaDir = new File(javaHome);
             assumeOrExit(2, "JAVA_HOME variable must point to a JDK directory, but was " + javaDir, javaDir.isDirectory());
 
-            var jvm = JVM.create(javaDir, "-Djava.class.path=target/classes");
+            var cp = "target/classes";
+            if (System.getenv("CP") instanceof String defined) {
+                cp = defined;
+            }
+            var jvm = JVM.create(javaDir, "-Djava.class.path=" + cp);
             jvm.executeMain("org/apidesign/demo/jvmlauncher/LaunchJvm", filteredArgs);
             return;
         }

@@ -59,24 +59,29 @@ public final class JVM {
      * {@code JNI_CreateJavaVM} entry point
      * @param options parameters to pass to the JVM
      * @return new instance of the JVM
+     * @throws IllegalArgumentException if {@code path} doesn't point to
+     *    a valid JVM location
      */
     public static JVM create(File path, String... options) {
         JNIBoot.JNICreateJavaVMPointer createJvmFn;
         File libPath;
         if (path.isDirectory()) {
             // assume it is a root of `System.getProperty("java.home")`
-            libPath
-                    = Platform.includedIn(Platform.WINDOWS.class)
-                    ? WindowsJVM.findDynamicLibrary(path)
-                    : PosixJVM.findDynamicLibrary(path);
+            libPath = Platform.includedIn(Platform.WINDOWS.class)
+                ? WindowsJVM.findDynamicLibrary(path)
+                : PosixJVM.findDynamicLibrary(path);
         } else {
             libPath = path;
         }
-        assert libPath.isFile();
-        createJvmFn
-                = Platform.includedIn(Platform.WINDOWS.class)
-                ? WindowsJVM.loadImpl(libPath.getAbsolutePath())
-                : PosixJVM.loadImpl(libPath.getAbsolutePath());
+        if (!libPath.isFile()) {
+            throw new IllegalArgumentException(libPath + " isn't a file");
+        }
+        createJvmFn = Platform.includedIn(Platform.WINDOWS.class)
+            ? WindowsJVM.loadImpl(libPath.getAbsolutePath())
+            : PosixJVM.loadImpl(libPath.getAbsolutePath());
+        if (createJvmFn.isNull()) {
+            throw new IllegalStateException("Cannot find JNI_CreateJavaVM symbol in " + libPath);
+        }
 
         var jvmArgs = new ArrayList<String>();
 
@@ -93,18 +98,29 @@ public final class JVM {
      * @param classNameWithSlashes class (with `/` as separators) to search main
      * method in
      * @param args arguments to pass to the main method
+     * @throws ClassNotFoundException when {@code classNameWithSlashes} cannot be found
+     *   or {@code main} method cannot be found in that class
      */
-    public final void executeMain(String classNameWithSlashes, String... args) {
+    public final void executeMain(String classNameWithSlashes, String... args)
+    throws ClassNotFoundException {
         var e = env();
-        try (var className = CTypeConversion.toCString(classNameWithSlashes); var mainName = CTypeConversion.toCString("main"); var stringName = CTypeConversion.toCString("java/lang/String"); var mainSig = CTypeConversion.toCString("([Ljava/lang/String;)V");) {
+        try (
+            var className = CTypeConversion.toCString(classNameWithSlashes);
+            var mainName = CTypeConversion.toCString("main");
+            var stringName = CTypeConversion.toCString("java/lang/String");
+            var mainSig = CTypeConversion.toCString("([Ljava/lang/String;)V");
+        ) {
             var fn = e.getFunctions();
             var mainClazz = fn.getFindClass().call(e, className.get());
-            assert mainClazz.isNonNull() : "Class not found " + classNameWithSlashes;
+            if (mainClazz.isNull()) {
+                throw new ClassNotFoundException("Class not found " + classNameWithSlashes);
+            }
             var mainMethod = fn.getGetStaticMethodID().call(e, mainClazz, mainName.get(), mainSig.get());
-            assert mainMethod.isNonNull() : "main method found in " + classNameWithSlashes;
-            var stringClazz = fn.getFindClass().call(e, stringName.get());
-            var argsCopy
-                    = fn.getNewObjectArray().call(e, args.length, stringClazz, WordFactory.nullPointer());
+            if (mainMethod.isNull()) {
+                throw new ClassNotFoundException("Method main not found in " + classNameWithSlashes);
+            }
+            var jString = fn.getFindClass().call(e, stringName.get());
+            var argsCopy = fn.getNewObjectArray().call(e, args.length, jString, WordFactory.nullPointer());
 
             for (var i = 0; i < args.length; i++) {
                 try (var ithArg = CTypeConversion.toCString(args[i]);) {
