@@ -1,6 +1,6 @@
 # Next Release
 
-- [`executeMain` throws `ClassNotFoundException`][14980]
+- [`executeMain` throws `ClassNotFoundException`][7]
 
 [7]: https://github.com/jtulach/graalvm-native-libs/pull/7
 
