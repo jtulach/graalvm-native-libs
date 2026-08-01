@@ -68,11 +68,14 @@ public final class PrintingCallback implements BiConsumer<CharSequence, Map<Stri
     private final Pattern methods;
     private PrintingCallback(JvmInsight insight, Pattern classes, Pattern methods) {
         this.methods = methods;
-        insight.configure((info) -> {
+        insight.onMethod((method, bldr) -> {
+            var info = method.clazz();
             var okLoader = info.loader() == ClassLoader.getSystemClassLoader();
-            return okLoader && classes.matcher(info.name()).matches();
-        }, (bldr) -> {
-            bldr.methods(m -> methods.matcher(m).matches()).roots(true).call(this);
+            if (okLoader && classes.matcher(info.name()).matches()) {
+                if (methods.matcher(method).matches()) {
+                    bldr.roots(true).call(this);
+                }
+            }
         });
     }
 

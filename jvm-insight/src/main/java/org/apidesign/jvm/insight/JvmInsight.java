@@ -13,6 +13,7 @@
  */
 package org.apidesign.jvm.insight;
 
+import java.io.IOException;
 import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
@@ -22,16 +23,14 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.function.Function;
 
 /** {@link JvmInsight} allows advanced instrumentation to be applied to
  * classes running inside of the JVM.
@@ -49,7 +48,7 @@ public final class JvmInsight  {
         JvmInsightInitializer.getInstrumentation()
     );
     private final Object instr;
-    private final List<Registry> registrations = new CopyOnWriteArrayList<>();
+    private final List<Function<? super ClassInfo, Boolean>> onClass = new CopyOnWriteArrayList<>();
 
     JvmInsight(Object instr) {
         this.instr = instr;
@@ -71,25 +70,65 @@ public final class JvmInsight  {
     /**
      * Applies new Insights to the running JVM.
      *
-     * @param classFilter identifies which classes to instrument with the
-     *   JVM Insight capabilities. The argument for the function is the
-     *   fully qualified JVM name of the class -
-     *   e.g. {@code java/lang/String}, etc.
-     *
-     * @param block block that receives an instance of {@link JvmInsight.Builder}
-     *   factory and can use it to configure its JVM Insights. The block
-     *   is invoked once, at the first moment an eligible class is found
+     * @param block block that receives an instance of a {@link MethodInfo}
+     *   (that belongs to {@link ClassInfo}) and a {@link JvmInsight.Builder}
+     *   factory. The block can use the builder to configure its JVM Insights
+     *   to be applied to the given method. The block
+     *   may be invoked multiple times (even for the same method). It
+     *   is expected the block behaves always the same for the same method.
      *
      * @return a handle that can be {@link AutoCloseable#close()} when
      *   these insights are to be disabled
      */
-    public AutoCloseable configure(
-        Predicate<? super ClassInfo> classFilter,
-        Consumer<? super Builder> block
-    ) {
-        var registrar = new Registry(classFilter, block);
-        registrations.add(registrar);
-        return registrar;
+    public AutoCloseable onMethod(BiConsumer<MethodInfo, Builder> block) {
+        class CheckAndPerform implements Function<ClassInfo, Boolean>, BiConsumer<MethodInfo, Builder>, AutoCloseable {
+            @Override
+            public Boolean apply(ClassInfo info) {
+                var isAppliedBuilder = new Builder() {
+                    private boolean activated;
+                    @Override
+                    public Builder when(When type) {
+                        return this;
+                    }
+
+                    @Override
+                    public Builder roots(boolean roots) {
+                        return this;
+                    }
+
+                    @Override
+                    public Builder statements(boolean statements) {
+                        return this;
+                    }
+
+                    @Override
+                    public void call(BiConsumer<? super At, Map<String, Object>> handler) {
+                        activated = true;
+                    }
+
+                };
+                for (var methodInfo : info) {
+                    block.accept(methodInfo, isAppliedBuilder);
+                    if (isAppliedBuilder.activated) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public void close() throws Exception {
+                onClass.remove(this);
+            }
+
+            @Override
+            public void accept(MethodInfo t, Builder u) {
+                block.accept(t, u);
+            }
+        }
+        var listener = new CheckAndPerform();
+        onClass.add(listener);
+        return listener;
     }
 
     /**
@@ -119,10 +158,21 @@ public final class JvmInsight  {
         private ClassModel model;
 
         ClassInfo(String name, Module module, ClassLoader loader, byte[] code) {
+            Objects.requireNonNull(code);
             this.name = name.replace('.', '/');
             this.module = module;
             this.loader = loader;
             this.code = code;
+        }
+
+        ClassInfo(Class<?> clazz) {
+            byte[] arr;
+            try (var is = clazz.getClassLoader().getResourceAsStream(clazz.getName().replace('.', '/') + ".class")) {
+                arr = is.readAllBytes();
+            } catch (IOException ex) {
+                throw new IllegalStateException(ex);
+            }
+            this(clazz.getName(), clazz.getModule(), clazz.getClassLoader(), arr);
         }
 
         /** Fully qualified name with dots. E.g. {@code java.lang.String}.
@@ -215,8 +265,8 @@ public final class JvmInsight  {
                 return false;
             }
             var instrument = false;
-            for (var r : insight.registrations) {
-                if (r.filter.test(this)) {
+            for (var r : insight.onClass) {
+                if (r.apply(this)) {
                     instrument = true;
                 }
             }
@@ -490,16 +540,50 @@ public final class JvmInsight  {
      * Use methods of this class to configure a callback and then register
      * it by calling {@link Builder#call}.
      */
-    public final class Builder {
-        private final Registry registry;
+    public abstract class Builder {
+        /** not available to public */
+        Builder() {
+        }
+
+        /** Specify when this callback should be triggered.
+         *
+         * @param type on enter or on return?
+         * @return this builder
+         */
+        public abstract Builder when(When type);
+
+        /** Specify whether this callback should be triggered on method enter/exit.
+         *
+         * @param roots specify {@code true} to enable tracking "roots"
+         * @return this builder
+         */
+        public abstract Builder roots(boolean roots);
+
+        /** Specify whether this callback should be triggered on each line/statement.
+         *
+         * @param statements specify {@code true} to enable tracking "statements"
+         * @return this builder
+         */
+        public abstract Builder statements(boolean statements);
+
+        /** Finishes building a callback. After configuring the builder
+         * options, call this mehtod to register the callback accordingly.
+         *
+         * @param handler a handler to be invoked when an event happens
+         */
+        public abstract void call(BiConsumer<? super At, Map<String, Object>> handler);
+    }
+
+    private final class BuilderImpl extends Builder {
         private final Class<?> clazz;
         private boolean statements;
         private boolean roots;
-        private Predicate<MethodInfo> methodFilter;
         private When when = When.ENTER;
+        private final MethodInfo method;
 
-        private Builder(Registry registry, Class<?> clazz) {
-            this.registry = registry;
+        private BuilderImpl(MethodInfo method, Class<?> clazz) {
+            Objects.requireNonNull(method);
+            this.method = method;
             this.clazz = clazz;
         }
 
@@ -534,24 +618,17 @@ public final class JvmInsight  {
             return this;
         }
 
-        /** Filter the methods where this callback shall be invoked.
-         *
-         * @param filter a predicate to decide if a method triggers the callback or not
-         * @return this builder
-         * @see MethodInfo
-         */
-        public Builder methods(Predicate<MethodInfo> filter) {
-            this.methodFilter = filter;
-            return this;
-        }
-
         /** Finishes building a callback. After configuring the builder
          * options, call this mehtod to register the callback accordingly.
          *
          * @param handler a handler to be invoke when an event happens
+         * @return an internal handle representing this callback,
+         *    {@link AutoCloseable#close()} it
+         *    to disassociate call registered by this method
          */
         public void call(BiConsumer<? super At, Map<String, Object>> handler) {
-            registry.register(this, handler);
+            var data = JvmInsightClassData.find(clazz);
+            data.register(roots, statements, when, method::equals, handler);
         }
     }
 
@@ -587,9 +664,7 @@ public final class JvmInsight  {
                     At.class
                 )
             );
-            var info = new ClassInfo(
-                clazz.getName(), clazz.getModule(), clazz.getClassLoader(), null
-            );
+            var info = new ClassInfo(clazz);
             var method = new MethodInfo(info, methodName, methodDescriptor);
             var at = new At(
                 When.valueOf(when.toUpperCase()),
@@ -604,9 +679,17 @@ public final class JvmInsight  {
     }
 
     private static Consumer<Map<String, Object>> init(At at) {
-        var insight = find(at.where().getClassLoader());
-        for (var registry : insight.registrations) {
-            registry.init.accept(insight.new Builder(registry, at.where()));
+        var clazz = at.where();
+        var insight = find(clazz.getClassLoader());
+        var classInfo = new ClassInfo(clazz);
+        for (var registry : insight.onClass) {
+            if (registry instanceof BiConsumer bi) {
+                var consumer = (BiConsumer<MethodInfo, Builder>)bi;
+                for (var t : classInfo) {
+                    var bldr = insight.new BuilderImpl(t, clazz);
+                    consumer.accept(t, bldr);
+                }
+            }
         }
         return null;
     }
@@ -619,38 +702,5 @@ public final class JvmInsight  {
     private static Consumer<Map<String, Object>> statements(At at) {
         var data = JvmInsightClassData.find(at.where());
         return data.statements(at);
-    }
-
-    private class Registry implements AutoCloseable {
-        private final Predicate<? super ClassInfo> filter;
-        private final Map<Class<?>, List<JvmInsightClassData.Convertor>> entries = new LinkedHashMap<>();
-        private final Consumer<? super Builder> init;
-
-        private Registry(Predicate<? super ClassInfo> classFilter, Consumer<? super Builder> block) {
-            this.filter = classFilter;
-            this.init = block;
-        }
-
-        @Override
-        public synchronized void close() throws Exception {
-            for (var entry : entries.entrySet()) {
-                var data = JvmInsightClassData.find(entry.getKey());
-                for (var reg : entry.getValue()) {
-                    data.unregister(reg);
-                }
-            }
-            entries.clear();
-        }
-
-        private synchronized void register(Builder bldr, BiConsumer<? super At, Map<String, Object>> handler) {
-            var data = JvmInsightClassData.find(bldr.clazz);
-            var reg = data.register(bldr.roots, bldr.statements, bldr.when, bldr.methodFilter, handler);
-            var list = entries.get(bldr.clazz);
-            if (list == null) {
-                list = new ArrayList<>();
-                entries.put(bldr.clazz, list);
-            }
-            list.add(reg);
-        }
     }
 }

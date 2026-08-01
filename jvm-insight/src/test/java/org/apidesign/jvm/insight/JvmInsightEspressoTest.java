@@ -16,9 +16,6 @@ package org.apidesign.jvm.insight;
 import org.apidesign.jvm.insight.samples.Factorial;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.lang.classfile.ClassElement;
-import java.lang.classfile.ClassModel;
-import java.lang.classfile.MethodModel;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.LinkedHashMap;
@@ -26,7 +23,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.apidesign.jvm.insight.JvmInsight.ClassInfo;
@@ -44,7 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.AfterEach;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -534,27 +529,21 @@ public final class JvmInsightEspressoTest {
                     fn.apply(ctx, needsTxtFrame ? txtFrame : frame);
                 };
                 var jvmInsight = JvmInsight.find(loader);
-                handle = jvmInsight.configure((info) -> {
-                    return rootNameFilter == null ? true : findAnyMethod(info, rootNameFilter);
-                }, (bldr) -> {
-                    switch (type) {
-                        case "enter" -> bldr.when(JvmInsight.When.ENTER);
-                        case "return" -> bldr.when(JvmInsight.When.RETURN);
-                        default -> throw new IllegalStateException(type);
+                handle = jvmInsight.onMethod((info, bldr) -> {
+                    if (rootNameFilter == null || rootNameFilter.matcher(info).matches()) {
+                        switch (type) {
+                            case "enter" -> bldr.when(JvmInsight.When.ENTER);
+                            case "return" -> bldr.when(JvmInsight.When.RETURN);
+                            default -> throw new IllegalStateException(type);
+                        }
+                        if (Boolean.TRUE.equals(cfg.get("roots"))) {
+                            bldr.roots(true);
+                        }
+                        if (Boolean.TRUE.equals(cfg.get("statements"))) {
+                            bldr.statements(true);
+                        }
+                        bldr.call(handler);
                     }
-                    if (Boolean.TRUE.equals(cfg.get("roots"))) {
-                        bldr.roots(true);
-                    }
-                    if (Boolean.TRUE.equals(cfg.get("statements"))) {
-                        bldr.statements(true);
-                    }
-                    if (rootNameFilter != null) {
-                        bldr.methods((info) -> {
-                           var m = rootNameFilter.matcher(info.toString());
-                           return m.matches();
-                        });
-                    }
-                    bldr.call(handler);
                 });
             }
         }

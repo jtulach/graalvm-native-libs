@@ -21,6 +21,7 @@ import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import org.apidesign.jvm.insight.JvmInsight.MethodInfo;
 import org.apidesign.jvm.insight.samples.Greetings;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -94,19 +95,18 @@ public class JvmInsightTest {
         var sum = new int[1];
         var counter = (BiConsumer<CharSequence, Map<String, Object>>) (at, frame) -> {
             var methodName = at.toString();
-            if (!methodName.contains("fac")) {
-                return;
-            }
             assertTrue(methodName.endsWith("fac(I)I"), "There is int fac(int): " + methodName);
             var n = (Number) frame.get("n");
             assertNotNull(n, "Local variable n is defined");
             sum[0] += n.intValue();
         };
 
-        jvmInsight.configure((_) -> true, (insight) -> {
-            insight
-                .roots(true)
-                .call(counter);
+        jvmInsight.onMethod((methodName, insight) -> {
+            if (methodName.name().equals("fac")) {
+                insight
+                    .roots(true)
+                    .call(counter);
+            }
         });
 
         var methodFac = loadFactorialClass().getMethod("fac", int.class);
@@ -120,9 +120,6 @@ public class JvmInsightTest {
         var sum = new int[1];
         var counter = (BiConsumer<CharSequence, Map<String, Object>>) (at, frame) -> {
             var methodName = at.toString();
-            if (!methodName.contains("facInst")) {
-                return;
-            }
             assertTrue(methodName.endsWith("facInst(I)I"), "There is int facInst(int): " + methodName);
 
 
@@ -136,10 +133,12 @@ public class JvmInsightTest {
             sum[0] += n.intValue();
         };
 
-        jvmInsight.configure((_) -> true, (insight) -> {
-            insight
-                .roots(true)
-                .call(counter);
+        jvmInsight.onMethod((method, insight) -> {
+            if (method.name().equals("facInst")) {
+                insight
+                    .roots(true)
+                    .call(counter);
+            }
         });
 
         var methodFac = loadFactorialClass().getMethod("facInst", int.class);
@@ -221,7 +220,7 @@ public class JvmInsightTest {
     public void testAllGreetingsMethodsInstrumented() throws Exception {
         var arr = new ByteArrayOutputStream();
         var out = new PrintStream(arr);
-        try (var _ = jvmInsight.configure((_) -> true, (bldr) -> {
+        try (var _ = jvmInsight.onMethod((methodInfo, bldr) -> {
             bldr.roots(true).call((t, u) -> {
                 out.println(t);
             });

@@ -55,14 +55,15 @@ public final class NativeLauncher {
         var loader = JvmInsight.createLoader(JvmInsight.class.getClassLoader(), cp);
         var jvmInsight = JvmInsight.find(loader);
 
-        try (var _ = jvmInsight.configure((n) -> {
-            return n.name().replace('.', '/').equals(args[1]);
-        }, bldr -> {
-            bldr.roots(true).call((name, localVars) -> {
-                if (localVars.containsKey("n")) {
-                    System.err.println("[Crema+JvmInsight]: method " + name + " with: " + localVars);
-                }
-            });
+        try (var _ = jvmInsight.onMethod((method, bldr) -> {
+            var n = method.clazz();
+            if (n.name().replace('.', '/').equals(args[1])) {
+                bldr.roots(true).call((name, localVars) -> {
+                    if (localVars.containsKey("n")) {
+                        System.err.println("[Crema+JvmInsight]: method " + name + " with: " + localVars);
+                    }
+                });
+            }
         })) {
             var clazz = loader.loadClass(args[1]);
             var method = clazz.getMethod("main", String[].class);

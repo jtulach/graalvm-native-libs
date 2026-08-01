@@ -22,23 +22,22 @@ public final class Insight {
     var prefix = findPrefix(args);
     var in = new ThreadLocal<Boolean>();
     in.set(false);
-    insight.configure((n) -> {
+    insight.onMethod((method, bldr) -> {
+        var n = method.clazz();
         var patch = n.jvmName().startsWith(prefix);
         if (patch) {
             System.err.println("[Insight] patch: " + n + " => " + patch);
-        }
-        return patch;
-    }, (bldr) -> {
-        bldr.when(JvmInsight.When.ENTER).roots(true).call((at, frame) -> {
-            if (!in.get()) {
-                try {
-                    in.set(true);
-                    System.err.println("[Insight] at: " + at + " frame: " + frame);
-                } finally {
-                    in.set(false);
+            bldr.when(JvmInsight.When.ENTER).roots(true).call((at, frame) -> {
+                if (!in.get()) {
+                    try {
+                        in.set(true);
+                        System.err.println("[Insight] at: " + at + " frame: " + frame);
+                    } finally {
+                        in.set(false);
+                    }
                 }
-            }
-        });
+            });
+        }
     });
   }
 
