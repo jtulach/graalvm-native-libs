@@ -16,7 +16,6 @@
 // $ java -cp ${classes} -javaagent:${jvminsight}=Insight,prefix=java/util/concurrent/ AddToArray A B X
 // > [A, B, X]
 // 2> [Insight] args: prefix=java/util/concurrent/
-// 2> [Insight] patch: java/util/concurrent/CopyOnWriteArraySet => true
 // 2> [JvmInsightAgent]: Transforming java/util/concurrent/CopyOnWriteArraySet
 // 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.<init>()V frame: {this=null}
 // 2> [Insight] at: -1:Ljava/util/concurrent/CopyOnWriteArraySet;.add(Ljava/lang/Object;)Z frame: {e=A, this=[]}

@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -25,16 +26,27 @@ import java.util.function.Predicate;
 import org.apidesign.jvm.insight.JvmInsight.At;
 
 final class JvmInsightClassData {
+    private static final Map<JvmInsight.ClassInfo, JvmInsight.ClassInfo> CACHE = new ConcurrentHashMap<>();
     private static final Provider PROVIDER = new Provider();
+    private final JvmInsight.ClassInfo info;
     private final Map<JvmInsight.When, List<Convertor>> roots = new EnumMap<>(JvmInsight.When.class);
     private final Map<JvmInsight.When, List<Convertor>> statements = new EnumMap<>(JvmInsight.When.class);
 
-    private JvmInsightClassData(Class<?> type) {
+    private JvmInsightClassData(Class<?> type, JvmInsight.ClassInfo info) {
+        this.info = info;
     }
 
     static final JvmInsightClassData find(Class<?> type) {
         Objects.requireNonNull(type);
         return PROVIDER.get(type);
+    }
+
+    static final void keep(JvmInsight.ClassInfo info) {
+        CACHE.put(info, info);
+    }
+
+    final JvmInsight.ClassInfo info() {
+        return info;
     }
 
     final Consumer<Map<String, Object>> roots(JvmInsight.At at) {
@@ -98,7 +110,10 @@ final class JvmInsightClassData {
     private static final class Provider extends ClassValue<JvmInsightClassData> {
         @Override
         protected JvmInsightClassData computeValue(Class<?> type) {
-            return new JvmInsightClassData(type);
+            var template = new JvmInsight.ClassInfo(type);
+            var real = CACHE.remove(template);
+            Objects.requireNonNull(real, "Cannot find " + template + " in\n" + CACHE);
+            return new JvmInsightClassData(type, real);
         }
     }
 

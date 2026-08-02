@@ -41,7 +41,7 @@ final class JvmInsightLoader extends URLClassLoader {
         }
         try {
             var arr = is.readAllBytes();
-            var info = new JvmInsight.ClassInfo(name, null, this, arr);
+            var info = new JvmInsight.ClassInfo(name, this.getUnnamedModule(), this, arr);
             var newArr = info.instrumentClass(jvmInsight) ?
                     patch(info) : arr;
             /* Enable and inspect with javap -c -private * /
@@ -51,6 +51,7 @@ final class JvmInsightLoader extends URLClassLoader {
                 os.write(newArr);
             }
             /* */
+            JvmInsightClassData.keep(info);
             return defineClass(name, newArr, 0, newArr.length);
         } catch (IOException ex) {
             throw new ClassNotFoundException(name, ex);

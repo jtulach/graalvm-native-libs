@@ -26,7 +26,6 @@ public final class Insight {
         var n = method.clazz();
         var patch = n.jvmName().startsWith(prefix);
         if (patch) {
-            System.err.println("[Insight] patch: " + n + " => " + patch);
             bldr.when(JvmInsight.When.ENTER).roots(true).call((at, frame) -> {
                 if (!in.get()) {
                     try {

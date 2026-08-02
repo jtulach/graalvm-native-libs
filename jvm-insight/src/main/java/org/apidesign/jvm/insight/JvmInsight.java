@@ -13,7 +13,6 @@
  */
 package org.apidesign.jvm.insight;
 
-import java.io.IOException;
 import java.lang.classfile.ClassElement;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
@@ -166,13 +165,7 @@ public final class JvmInsight  {
         }
 
         ClassInfo(Class<?> clazz) {
-            byte[] arr;
-            try (var is = clazz.getClassLoader().getResourceAsStream(clazz.getName().replace('.', '/') + ".class")) {
-                arr = is.readAllBytes();
-            } catch (IOException ex) {
-                throw new IllegalStateException(ex);
-            }
-            this(clazz.getName(), clazz.getModule(), clazz.getClassLoader(), arr);
+            this(clazz.getName(), clazz.getModule(), clazz.getClassLoader(), new byte[0]);
         }
 
         /** Fully qualified name with dots. E.g. {@code java.lang.String}.
@@ -664,7 +657,7 @@ public final class JvmInsight  {
                     At.class
                 )
             );
-            var info = new ClassInfo(clazz);
+            var info = JvmInsightClassData.find(clazz).info();
             var method = new MethodInfo(info, methodName, methodDescriptor);
             var at = new At(
                 When.valueOf(when.toUpperCase()),
@@ -681,7 +674,7 @@ public final class JvmInsight  {
     private static Consumer<Map<String, Object>> init(At at) {
         var clazz = at.where();
         var insight = find(clazz.getClassLoader());
-        var classInfo = new ClassInfo(clazz);
+        var classInfo = JvmInsightClassData.find(clazz).info();
         for (var registry : insight.onClass) {
             if (registry instanceof BiConsumer bi) {
                 var consumer = (BiConsumer<MethodInfo, Builder>)bi;

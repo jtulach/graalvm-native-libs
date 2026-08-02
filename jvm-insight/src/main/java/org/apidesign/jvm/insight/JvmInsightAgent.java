@@ -81,6 +81,7 @@ final class JvmInsightAgent implements ClassFileTransformer {
         var info = new JvmInsight.ClassInfo(className, module, loader, code);
         if (info.instrumentClass(insight)) {
             log("Transforming " + className);
+            JvmInsightClassData.keep(info);
             try {
                 var model = info.classModel();
                 var trans = JvmInsightTransform.create(model, ClassFile.latestMajorVersion(), ClassFile.latestMinorVersion());
