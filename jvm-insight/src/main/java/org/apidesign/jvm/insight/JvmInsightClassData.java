@@ -49,6 +49,15 @@ final class JvmInsightClassData {
         return info;
     }
 
+    final JvmInsight.MethodInfo method(String name, String descriptor) {
+        for (var m : info) {
+            if (m.name().equals(name) && m.descriptor().equals(descriptor)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
     final Consumer<Map<String, Object>> roots(JvmInsight.At at) {
         var local = roots.get(at.when());
         return dispatcher(local, at);
@@ -117,7 +126,7 @@ final class JvmInsightClassData {
         }
     }
 
-    static class Convertor implements BiConsumer<At, Map<String, Object>>, AutoCloseable {
+    static class Convertor implements AutoCloseable {
         private final JvmInsightClassData data;
         private final boolean roots;
         private final boolean statements;
@@ -140,9 +149,8 @@ final class JvmInsightClassData {
             this.statements = statements;
         }
 
-        @Override
         public void accept(At t, Map<String, Object> data) {
-            if (!methodFilter.equals(t.method())) {
+            if (methodFilter != t.method()) {
                 return;
             }
             var names = (String[]) data.get("names");

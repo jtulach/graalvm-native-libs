@@ -112,7 +112,10 @@ public final class JvmInsight  {
         private final Module module;
         private final ClassLoader loader;
         private final byte[] code;
+        /** @GuardedBy("this") */
         private ClassModel model;
+        /** @GuardedBy("this") */
+        private List<MethodInfo> methods;
 
         ClassInfo(String name, Module module, ClassLoader loader, byte[] code) {
             Objects.requireNonNull(code);
@@ -183,21 +186,24 @@ public final class JvmInsight  {
          * @return the parsed model of the class
          */
         @Override
-        public Iterator<MethodInfo> iterator() {
-            var models = classModel().elementStream().mapMulti((ClassElement t, Consumer<MethodModel> sink) -> {
-                if (t instanceof MethodModel m) {
-                    sink.accept(m);
-                }
-            });
-            var infos = models.map(e -> {
-                var methodName = e.methodName().stringValue();
-                var descriptor = e.methodType().stringValue();
-                return new MethodInfo(this, methodName, descriptor);
-            });
-            return infos.iterator();
+        public synchronized Iterator<MethodInfo> iterator() {
+            if (this.methods == null) {
+                var models = classModel().elementStream().mapMulti((ClassElement t, Consumer<MethodModel> sink) -> {
+                    if (t instanceof MethodModel m) {
+                        sink.accept(m);
+                    }
+                });
+                var infos = models.map(e -> {
+                    var methodName = e.methodName().stringValue();
+                    var descriptor = e.methodType().stringValue();
+                    return new MethodInfo(this, methodName, descriptor);
+                });
+                this.methods = infos.toList();
+            }
+            return this.methods.iterator();
         }
 
-        final ClassModel classModel() {
+        synchronized final ClassModel classModel() {
             if (model == null) {
                 var file = ClassFile.of();
                 model = file.parse(code);
@@ -692,8 +698,7 @@ public final class JvmInsight  {
                     At.class
                 )
             );
-            var info = JvmInsightClassData.find(clazz).info();
-            var method = new MethodInfo(info, methodName, methodDescriptor);
+            var method = JvmInsightClassData.find(clazz).method(methodName, methodDescriptor);
             var at = new At(
                 When.valueOf(when.toUpperCase()),
                 clazz, method, line
