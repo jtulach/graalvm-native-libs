@@ -225,12 +225,21 @@ public class JvmInsightTest {
                 out.println(t);
             });
         })) {
+            // first of all enable JVM Insight hook and only then loadGreetingsClass
             var method = loadGreetingsClass().getMethod("out", PrintStream.class);
             method.invoke(null, out);
         }
         assertEquals("""
         -1:Lorg/apidesign/jvm/insight/samples/Greetings;.out(Ljava/io/PrintStream;)V
         -1:Lorg/apidesign/jvm/insight/samples/Greetings;.greeting()Ljava/lang/String;
+        Hello JVM Insight!
+        """, arr.toString());
+
+        arr.reset();
+        var method = loadGreetingsClass().getMethod("out", PrintStream.class);
+        method.invoke(null, out);
+
+        assertEquals("""
         Hello JVM Insight!
         """, arr.toString());
     }

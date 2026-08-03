@@ -73,10 +73,10 @@ final class JvmInsightClassData {
 
     synchronized Convertor register(
         boolean roots, boolean statements,
-        JvmInsight.When when, Predicate<JvmInsight.MethodInfo> methodFilter,
+        JvmInsight.When when, JvmInsight.MethodInfo methodFilter,
         BiConsumer<? super At, Map<String, Object>> handler
     ) {
-        var c = new Convertor(roots, statements, when, methodFilter, handler);
+        var c = new Convertor(this, roots, statements, when, methodFilter, handler);
         if (roots) {
             var prev = this.roots.get(c.when);
             if (prev == null) {
@@ -117,19 +117,22 @@ final class JvmInsightClassData {
         }
     }
 
-    static class Convertor implements BiConsumer<At, Map<String, Object>> {
+    static class Convertor implements BiConsumer<At, Map<String, Object>>, AutoCloseable {
+        private final JvmInsightClassData data;
         private final boolean roots;
         private final boolean statements;
         private final JvmInsight.When when;
-        private final Predicate<JvmInsight.MethodInfo> methodFilter;
+        private final JvmInsight.MethodInfo methodFilter;
         private final BiConsumer<? super At, Map<String, Object>> handler;
 
         private Convertor(
+            JvmInsightClassData data,
             boolean roots, boolean statements,
             JvmInsight.When when,
-            Predicate<JvmInsight.MethodInfo> methodFilter,
+            JvmInsight.MethodInfo methodFilter,
             BiConsumer<? super At, Map<String, Object>> handler
         ) {
+            this.data = data;
             this.handler = handler;
             this.roots = roots;
             this.when = when;
@@ -139,7 +142,7 @@ final class JvmInsightClassData {
 
         @Override
         public void accept(At t, Map<String, Object> data) {
-            if (methodFilter != null && !methodFilter.test(t.method())) {
+            if (!methodFilter.equals(t.method())) {
                 return;
             }
             var names = (String[]) data.get("names");
@@ -156,6 +159,11 @@ final class JvmInsightClassData {
                     values[i] = frame.get(names[i]);
                 }
             }
+        }
+
+        @Override
+        public void close() throws Exception {
+            data.unregister(this);
         }
     }
 }

@@ -22,6 +22,7 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import org.apidesign.jvm.insight.JvmInsightClassData.Convertor;
 
 /** {@link JvmInsight} allows advanced instrumentation to be applied to
  * classes running inside of the JVM.
@@ -47,7 +49,7 @@ public final class JvmInsight  {
         JvmInsightInitializer.getInstrumentation()
     );
     private final Object instr;
-    private final List<Function<? super ClassInfo, Boolean>> onClass = new CopyOnWriteArrayList<>();
+    private final List<OnMethodClosable> onClass = new CopyOnWriteArrayList<>();
 
     JvmInsight(Object instr) {
         this.instr = instr;
@@ -80,52 +82,7 @@ public final class JvmInsight  {
      *   these insights are to be disabled
      */
     public AutoCloseable onMethod(BiConsumer<MethodInfo, Builder> block) {
-        class CheckAndPerform implements Function<ClassInfo, Boolean>, BiConsumer<MethodInfo, Builder>, AutoCloseable {
-            @Override
-            public Boolean apply(ClassInfo info) {
-                var isAppliedBuilder = new Builder() {
-                    private boolean activated;
-                    @Override
-                    public Builder when(When type) {
-                        return this;
-                    }
-
-                    @Override
-                    public Builder roots(boolean roots) {
-                        return this;
-                    }
-
-                    @Override
-                    public Builder statements(boolean statements) {
-                        return this;
-                    }
-
-                    @Override
-                    public void call(BiConsumer<? super At, Map<String, Object>> handler) {
-                        activated = true;
-                    }
-
-                };
-                for (var methodInfo : info) {
-                    block.accept(methodInfo, isAppliedBuilder);
-                    if (isAppliedBuilder.activated) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            @Override
-            public void close() throws Exception {
-                onClass.remove(this);
-            }
-
-            @Override
-            public void accept(MethodInfo t, Builder u) {
-                block.accept(t, u);
-            }
-        }
-        var listener = new CheckAndPerform();
+        var listener = new OnMethodClosable(block);
         onClass.add(listener);
         return listener;
     }
@@ -259,7 +216,7 @@ public final class JvmInsight  {
             }
             var instrument = false;
             for (var r : insight.onClass) {
-                if (r.apply(this)) {
+                if (r.instrumentClass(this)) {
                     instrument = true;
                 }
             }
@@ -533,7 +490,7 @@ public final class JvmInsight  {
      * Use methods of this class to configure a callback and then register
      * it by calling {@link Builder#call}.
      */
-    public abstract class Builder {
+    public static abstract class Builder {
         /** not available to public */
         Builder() {
         }
@@ -567,14 +524,72 @@ public final class JvmInsight  {
         public abstract void call(BiConsumer<? super At, Map<String, Object>> handler);
     }
 
-    private final class BuilderImpl extends Builder {
+    class OnMethodClosable implements AutoCloseable {
+        private final BiConsumer<MethodInfo, Builder> block;
+        private final List<Convertor> convertors = new ArrayList<>();
+
+        OnMethodClosable(BiConsumer<MethodInfo, Builder> block) {
+            this.block = block;
+        }
+
+        public Boolean instrumentClass(ClassInfo info) {
+            var isAppliedBuilder = new Builder() {
+                private boolean activated;
+                @Override
+                public Builder when(When type) {
+                    return this;
+                }
+
+                @Override
+                public Builder roots(boolean roots) {
+                    return this;
+                }
+
+                @Override
+                public Builder statements(boolean statements) {
+                    return this;
+                }
+
+                @Override
+                public void call(BiConsumer<? super At, Map<String, Object>> handler) {
+                    activated = true;
+                }
+
+            };
+            for (var methodInfo : info) {
+                block.accept(methodInfo, isAppliedBuilder);
+                if (isAppliedBuilder.activated) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void close() throws Exception {
+            onClass.remove(this);
+            for (var c : convertors) {
+                c.close();
+            }
+        }
+
+        public void register(MethodInfo t, Class<?> clazz) {
+            var bldr = new OnMethodBuilder(t, clazz);
+            block.accept(t, bldr);
+            convertors.addAll(bldr.resetConvertors());
+        }
+    }
+
+    private final static class OnMethodBuilder extends Builder {
         private final Class<?> clazz;
         private boolean statements;
         private boolean roots;
         private When when = When.ENTER;
         private final MethodInfo method;
+        /** guarded by this */
+        private List<Convertor> convertors;
 
-        private BuilderImpl(MethodInfo method, Class<?> clazz) {
+        private OnMethodBuilder(MethodInfo method, Class<?> clazz) {
             Objects.requireNonNull(method);
             this.method = method;
             this.clazz = clazz;
@@ -585,6 +600,7 @@ public final class JvmInsight  {
          * @param type on enter or on return?
          * @return this builder
          */
+        @Override
         public Builder when(When type) {
             Objects.requireNonNull(type);
             this.when = type;
@@ -596,6 +612,7 @@ public final class JvmInsight  {
          * @param roots specify {@code true} to enable tracking "roots"
          * @return this builder
          */
+        @Override
         public Builder roots(boolean roots) {
             this.roots = roots;
             return this;
@@ -606,6 +623,7 @@ public final class JvmInsight  {
          * @param statements specify {@code true} to enable tracking "statements"
          * @return this builder
          */
+        @Override
         public Builder statements(boolean statements) {
             this.statements = true;
             return this;
@@ -619,9 +637,22 @@ public final class JvmInsight  {
          *    {@link AutoCloseable#close()} it
          *    to disassociate call registered by this method
          */
+        @Override
         public void call(BiConsumer<? super At, Map<String, Object>> handler) {
             var data = JvmInsightClassData.find(clazz);
-            data.register(roots, statements, when, method::equals, handler);
+            var conv = data.register(roots, statements, when, method, handler);
+            synchronized (this) {
+                if (convertors == null) {
+                    convertors = new ArrayList<>();
+                }
+                convertors.add(conv);
+            }
+        }
+
+        final synchronized List<Convertor> resetConvertors() {
+            var prev = convertors;
+            convertors = null;
+            return prev == null ? List.of() : prev;
         }
     }
 
@@ -676,12 +707,8 @@ public final class JvmInsight  {
         var insight = find(clazz.getClassLoader());
         var classInfo = JvmInsightClassData.find(clazz).info();
         for (var registry : insight.onClass) {
-            if (registry instanceof BiConsumer bi) {
-                var consumer = (BiConsumer<MethodInfo, Builder>)bi;
-                for (var t : classInfo) {
-                    var bldr = insight.new BuilderImpl(t, clazz);
-                    consumer.accept(t, bldr);
-                }
+            for (var t : classInfo) {
+                registry.register(t, clazz);
             }
         }
         return null;
