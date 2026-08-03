@@ -140,6 +140,9 @@
                                 --snippet-path=${basedir}/src/test/java
                             </additionalOption>
                         </additionalOptions>
+                        <links>
+                            <link>https://www.graalvm.org/truffle/javadoc/</link>
+                        </links>
                     </configuration>
                 </plugin>
                 <plugin>
