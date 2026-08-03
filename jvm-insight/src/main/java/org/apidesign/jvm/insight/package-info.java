@@ -16,8 +16,4 @@
  * {@link org.apidesign.jvm.insight.JvmInsight} to instrument JVM methods
  * easily, dynamically and with no overhead.
  */
-module org.apidesign.jvm.insight {
-    exports org.apidesign.jvm.insight;
-
-    requires static java.instrument;
-}
+package org.apidesign.jvm.insight;

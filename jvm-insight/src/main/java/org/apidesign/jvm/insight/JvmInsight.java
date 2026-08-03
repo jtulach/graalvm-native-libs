@@ -30,15 +30,16 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import org.apidesign.jvm.insight.JvmInsightClassData.Convertor;
 
 /** {@link JvmInsight} allows advanced instrumentation to be applied to
  * classes running inside of the JVM.
  * <ul>
  *   <li>Use {@link JvmInsight#find} method to obtain instance of the JVM Insight</li>
- *   <li>Then use its {@link JvmInsight#configure} method to setup up an
+ *   <li>Then use its {@link JvmInsight#onMethod} method to setup up an
  *      Insight hook</li>
+ *   <li>All methods of newly loaded classes are going to be sent into
+ *      the hook and it configure their instrumentation</li>
  * </ul>
  *
  */
@@ -89,8 +90,8 @@ public final class JvmInsight  {
 
     /**
      * Creates a {@link JvmInsight}-ready classloader. Classes loaded by
-     * this {@link ClassLoader} are patched to be ready for {@link #configure}-ing
-     * JVM Insights.
+     * this {@link ClassLoader} are patched to be ready for {@link #onMethod}-ing
+     * JVM Insights, if there is a hook registered for their methods.
      *
      * @param parent the parent classloader to use or {@code null}
      * @param cp set of classpath elements to load classes from
@@ -101,7 +102,7 @@ public final class JvmInsight  {
         return loader;
     }
 
-    /** Info about class to be loaded. In addition to providing various
+    /** Info about class (to be) loaded. In addition to providing various
      * info about the class to be loaded, it also implements a {@link CharSequence}
      * representing the same content of {@link #name()}, so filters
      * can work with generic type when just a name is enough to filter.
@@ -254,7 +255,7 @@ public final class JvmInsight  {
         }
     }
 
-    /** Info about a method being defined. In addition to providing various
+    /** Info about a method (being) defined. In addition to providing various
      * info about the methodto be loaded, it also implements a {@link CharSequence}
      * giving access to
      */
@@ -360,10 +361,13 @@ public final class JvmInsight  {
 
     /** Type of JVM Insight event. */
     public enum When {
-        ENTER, RETURN;
+        /** Deliver the event before the given location is executed. */
+        ENTER,
+        /** Deliver the event after the given location is executed. */
+        RETURN;
     }
 
-    /** Identifies a location of JVM Insight event. It carries individual
+    /** Identifies a location of a JVM Insight event. It carries individual
      * informations about {@link #line()}, {@link #when()}, {@link #where()}
      * as well as implements {@link CharSequence} that represents fully
      * qualified identification of the location - equivalent
@@ -486,7 +490,7 @@ public final class JvmInsight  {
 
     }
 
-    /** Configuration for an Insight callback.
+    /** Configuration of a JVM Insight callback.
      * Use methods of this class to configure a callback and then register
      * it by calling {@link Builder#call}.
      */

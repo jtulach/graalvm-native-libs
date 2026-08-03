@@ -68,10 +68,12 @@ public final class OtherJvmClassLoader implements AutoCloseable {
     }
 
     /**
-     * Loads a class as a value.
+     * Loads a class as a value. Continue invokining static methods
+     * via {@link Value#invokeMember} or creating new instances via
+     * {@link Value#newInstance}.
      *
      * @param fqn fully qualified name of class to load
-     * @return
+     * @return a value representing the class
      */
     public final Value loadClass(String fqn) {
         try {

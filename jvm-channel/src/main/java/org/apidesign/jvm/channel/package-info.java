@@ -13,11 +13,8 @@
  */
 
 /**
- * {@link org.apidesign.jvm.insight.JvmInsight} to instrument JVM methods
- * easily, dynamically and with no overhead.
+ * Use {@link org.apidesign.jvm.channel.JVM} to launch HotSpot JVM or another SVM
+ * in the same process. Use {@link org.apidesign.jvm.channel.Channel} to establish
+ * a communication channel between these two JVMs.
  */
-module org.apidesign.jvm.insight {
-    exports org.apidesign.jvm.insight;
-
-    requires static java.instrument;
-}
+package org.apidesign.jvm.channel;

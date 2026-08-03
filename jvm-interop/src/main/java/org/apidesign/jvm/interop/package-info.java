@@ -13,11 +13,8 @@
  */
 
 /**
- * {@link org.apidesign.jvm.insight.JvmInsight} to instrument JVM methods
- * easily, dynamically and with no overhead.
+ * Offers {@link org.apidesign.jvm.interop.OtherJvmClassLoader class loader}
+ * to access classes loaded from the <strong>other JVM</strong> via
+ * {@link org.apidesign.jvm.channel.Channel} easily.
  */
-module org.apidesign.jvm.insight {
-    exports org.apidesign.jvm.insight;
-
-    requires static java.instrument;
-}
+package org.apidesign.jvm.interop;

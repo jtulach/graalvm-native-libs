@@ -38,3 +38,5 @@ jobs:
     - name: Generate Javadoc
       run: mvn javadoc:jar
 
+    - name: Generate Aggregate Javadoc
+      run: mvn javadoc:aggregate
