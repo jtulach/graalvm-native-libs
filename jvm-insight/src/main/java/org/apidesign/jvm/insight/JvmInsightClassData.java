@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import org.apidesign.jvm.insight.JvmInsight.At;
 
 final class JvmInsightClassData {
@@ -82,10 +81,10 @@ final class JvmInsightClassData {
 
     synchronized Convertor register(
         boolean roots, boolean statements,
-        JvmInsight.When when, JvmInsight.MethodInfo methodFilter,
+        JvmInsight.When when, JvmInsight.MethodInfo methodOrNull,
         BiConsumer<? super At, Map<String, Object>> handler
     ) {
-        var c = new Convertor(this, roots, statements, when, methodFilter, handler);
+        var c = new Convertor(this, roots, statements, when, methodOrNull, handler);
         if (roots) {
             var prev = this.roots.get(c.when);
             if (prev == null) {
@@ -131,7 +130,7 @@ final class JvmInsightClassData {
         private final boolean roots;
         private final boolean statements;
         private final JvmInsight.When when;
-        private final JvmInsight.MethodInfo methodFilter;
+        private final JvmInsight.MethodInfo methodOrNull;
         private final BiConsumer<? super At, Map<String, Object>> handler;
 
         private Convertor(
@@ -145,12 +144,12 @@ final class JvmInsightClassData {
             this.handler = handler;
             this.roots = roots;
             this.when = when;
-            this.methodFilter = methodFilter;
+            this.methodOrNull = methodFilter;
             this.statements = statements;
         }
 
         public void accept(At t, Map<String, Object> data) {
-            if (methodFilter != t.method()) {
+            if (methodOrNull != null && methodOrNull != t.method()) {
                 return;
             }
             var names = (String[]) data.get("names");

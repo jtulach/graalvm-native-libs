@@ -21,7 +21,6 @@ import java.net.URL;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import org.apidesign.jvm.insight.JvmInsight.MethodInfo;
 import org.apidesign.jvm.insight.samples.Greetings;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -217,10 +216,39 @@ public class JvmInsightTest {
     }
 
     @Test
-    public void testAllGreetingsMethodsInstrumented() throws Exception {
+    public void testAllGreetingsMethodsInstrumentedViaOnMethod() throws Exception {
         var arr = new ByteArrayOutputStream();
         var out = new PrintStream(arr);
         try (var _ = jvmInsight.onMethod((methodInfo, bldr) -> {
+            if (methodInfo.name().equals("greeting")) {
+                bldr.roots(true).call((t, u) -> {
+                    out.println(t);
+                });
+            }
+        })) {
+            // first of all enable JVM Insight hook and only then loadGreetingsClass
+            var method = loadGreetingsClass().getMethod("out", PrintStream.class);
+            method.invoke(null, out);
+        }
+        assertEquals("""
+        -1:Lorg/apidesign/jvm/insight/samples/Greetings;.greeting()Ljava/lang/String;
+        Hello JVM Insight!
+        """, arr.toString());
+
+        arr.reset();
+        var method = loadGreetingsClass().getMethod("out", PrintStream.class);
+        method.invoke(null, out);
+
+        assertEquals("""
+        Hello JVM Insight!
+        """, arr.toString());
+    }
+
+    @Test
+    public void testAllGreetingsMethodsInstrumentedViaOnClass() throws Exception {
+        var arr = new ByteArrayOutputStream();
+        var out = new PrintStream(arr);
+        try (var _ = jvmInsight.onClass((classInfo, bldr) -> {
             bldr.roots(true).call((t, u) -> {
                 out.println(t);
             });

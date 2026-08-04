@@ -41,7 +41,9 @@ import org.apidesign.jvm.insight.JvmInsightClassData.Convertor;
  *   <li>All methods of newly loaded classes are going to be sent into
  *      the hook and it configure their instrumentation</li>
  * </ul>
- *
+ * There is also {@link JvmInsight#onClass} method that can be useful to
+ * observe classes being loaded into the JVM or registering hooks for all
+ * methods of such classes.
  */
 public final class JvmInsight  {
     /** Default JVM Insight to be used for the whole JVM.
@@ -50,7 +52,7 @@ public final class JvmInsight  {
         JvmInsightInitializer.getInstrumentation()
     );
     private final Object instr;
-    private final List<OnMethodClosable> onClass = new CopyOnWriteArrayList<>();
+    private final List<OnLoadClosable> activated = new CopyOnWriteArrayList<>();
 
     JvmInsight(Object instr) {
         this.instr = instr;
@@ -70,21 +72,42 @@ public final class JvmInsight  {
     }
 
     /**
-     * Applies new Insights to the running JVM.
+     * Applies new Insights to the running JVM on a per method basis.
+     *
+     * @param block block that receives an instance of a {@link ClassInfo}) and
+     *   a {@link JvmInsight.Builder}
+     *   factory. The block can use the builder to configure its JVM Insights
+     *   to be applied to all methods of the given class. The block
+     *   may be invoked multiple times (even for the same class). It
+     *   is expected the block behaves the same for the invocation
+     *   with the same argument.
+     *
+     * @return a handle that can be {@link AutoCloseable#close()} when
+     *   these insights are to be disabled
+     */
+    public AutoCloseable onClass(BiConsumer<ClassInfo, Builder> block) {
+        var listener = new OnLoadClosable(null, block);
+        activated.add(listener);
+        return listener;
+    }
+
+    /**
+     * Applies new Insights to the running JVM on a per method basis.
      *
      * @param block block that receives an instance of a {@link MethodInfo}
      *   (that belongs to {@link ClassInfo}) and a {@link JvmInsight.Builder}
      *   factory. The block can use the builder to configure its JVM Insights
      *   to be applied to the given method. The block
      *   may be invoked multiple times (even for the same method). It
-     *   is expected the block behaves always the same for the same method.
+     *   is expected the block behaves the same for the invocation
+     *   with the same argument.
      *
      * @return a handle that can be {@link AutoCloseable#close()} when
      *   these insights are to be disabled
      */
     public AutoCloseable onMethod(BiConsumer<MethodInfo, Builder> block) {
-        var listener = new OnMethodClosable(block);
-        onClass.add(listener);
+        var listener = new OnLoadClosable(block, null);
+        activated.add(listener);
         return listener;
     }
 
@@ -222,7 +245,7 @@ public final class JvmInsight  {
                 return false;
             }
             var instrument = false;
-            for (var r : insight.onClass) {
+            for (var r : insight.activated) {
                 if (r.instrumentClass(this)) {
                     instrument = true;
                 }
@@ -534,12 +557,14 @@ public final class JvmInsight  {
         public abstract void call(BiConsumer<? super At, Map<String, Object>> handler);
     }
 
-    class OnMethodClosable implements AutoCloseable {
-        private final BiConsumer<MethodInfo, Builder> block;
+    class OnLoadClosable implements AutoCloseable {
+        private final BiConsumer<MethodInfo, Builder> onMethod;
+        private final BiConsumer<ClassInfo, Builder> onClass;
         private final List<Convertor> convertors = new ArrayList<>();
 
-        OnMethodClosable(BiConsumer<MethodInfo, Builder> block) {
-            this.block = block;
+        OnLoadClosable(BiConsumer<MethodInfo, Builder> method, BiConsumer<ClassInfo, Builder> clazz) {
+            this.onMethod = method;
+            this.onClass = clazz;
         }
 
         public Boolean instrumentClass(ClassInfo info) {
@@ -566,10 +591,18 @@ public final class JvmInsight  {
                 }
 
             };
-            for (var methodInfo : info) {
-                block.accept(methodInfo, isAppliedBuilder);
+            if (onClass != null) {
+                onClass.accept(info, isAppliedBuilder);
                 if (isAppliedBuilder.activated) {
                     return true;
+                }
+            }
+            if (onMethod != null) {
+                for (var methodInfo : info) {
+                    onMethod.accept(methodInfo, isAppliedBuilder);
+                    if (isAppliedBuilder.activated) {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -577,20 +610,29 @@ public final class JvmInsight  {
 
         @Override
         public void close() throws Exception {
-            onClass.remove(this);
+            activated.remove(this);
             for (var c : convertors) {
                 c.close();
             }
         }
 
-        public void register(MethodInfo t, Class<?> clazz) {
-            var bldr = new OnMethodBuilder(t, clazz);
-            block.accept(t, bldr);
-            convertors.addAll(bldr.resetConvertors());
+        public void register(ClassInfo classInfo, Class<?> clazz) {
+            if (onMethod != null) {
+                for (var t : classInfo) {
+                    var bldr = new OnBuilder(t, clazz);
+                    onMethod.accept(t, bldr);
+                    convertors.addAll(bldr.resetConvertors());
+                }
+            }
+            if (onClass != null) {
+                var bldr = new OnBuilder(null, clazz);
+                onClass.accept(classInfo, bldr);
+                convertors.addAll(bldr.resetConvertors());
+            }
         }
     }
 
-    private final static class OnMethodBuilder extends Builder {
+    private final static class OnBuilder extends Builder {
         private final Class<?> clazz;
         private boolean statements;
         private boolean roots;
@@ -599,8 +641,7 @@ public final class JvmInsight  {
         /** guarded by this */
         private List<Convertor> convertors;
 
-        private OnMethodBuilder(MethodInfo method, Class<?> clazz) {
-            Objects.requireNonNull(method);
+        private OnBuilder(MethodInfo method, Class<?> clazz) {
             this.method = method;
             this.clazz = clazz;
         }
@@ -715,10 +756,8 @@ public final class JvmInsight  {
         var clazz = at.where();
         var insight = find(clazz.getClassLoader());
         var classInfo = JvmInsightClassData.find(clazz).info();
-        for (var registry : insight.onClass) {
-            for (var t : classInfo) {
-                registry.register(t, clazz);
-            }
+        for (var registry : insight.activated) {
+            registry.register(classInfo, clazz);
         }
         return null;
     }
