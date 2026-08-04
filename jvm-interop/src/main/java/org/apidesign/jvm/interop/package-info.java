@@ -17,15 +17,4 @@
  * to access classes loaded from the <strong>other JVM</strong> via
  * {@link org.apidesign.jvm.channel.Channel} easily.
  */
-module org.apidesign.jvm.interop {
-    requires org.apidesign.jvm.channel;
-    requires org.graalvm.truffle;
-    requires org.graalvm.polyglot;
-
-    exports org.apidesign.jvm.interop;
-    opens org.apidesign.jvm.interop.impl to
-        org.apidesign.jvm.channel;
-
-    /* only needed for testing purposes */
-    opens org.apidesign.jvm.interop.test;
-}
+package org.apidesign.jvm.interop;

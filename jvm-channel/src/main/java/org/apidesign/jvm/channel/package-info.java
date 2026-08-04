@@ -13,19 +13,8 @@
  */
 
 /**
- * Offers {@link org.apidesign.jvm.interop.OtherJvmClassLoader class loader}
- * to access classes loaded from the <strong>other JVM</strong> via
- * {@link org.apidesign.jvm.channel.Channel} easily.
+ * Use {@link org.apidesign.jvm.channel.JVM} to launch HotSpot JVM or another SVM
+ * in the same process. Use {@link org.apidesign.jvm.channel.Channel} to establish
+ * a communication channel between these two JVMs.
  */
-module org.apidesign.jvm.interop {
-    requires org.apidesign.jvm.channel;
-    requires org.graalvm.truffle;
-    requires org.graalvm.polyglot;
-
-    exports org.apidesign.jvm.interop;
-    opens org.apidesign.jvm.interop.impl to
-        org.apidesign.jvm.channel;
-
-    /* only needed for testing purposes */
-    opens org.apidesign.jvm.interop.test;
-}
+package org.apidesign.jvm.channel;
