@@ -518,9 +518,13 @@ public final class JvmInsight  {
 
     }
 
-    /** Configuration of a JVM Insight callback.
-     * Use methods of this class to configure a callback and then register
-     * it by calling {@link Builder#call}.
+    /** Configuration of a JVM Insight callback. Implementation of this class
+     * is obtained automatically after registering a callback via
+     * {@link JvmInsight#onClass} and {@link JvmInsight#onMethod}.
+     * Once the registered callback is invoked,
+     * use methods of this class to configure an insight to intercept
+     * execution of JVM code. Finish registration of such an insight
+     * by calling {@link Builder#call}.
      */
     public static abstract class Builder {
         /** not available to public */
@@ -562,7 +566,7 @@ public final class JvmInsight  {
      *
      * @param lkp lookup of the class that is being bytecode patched
      * @param name name of the configuration to fetch
-     *    - either {@code "ROOTS"} or {@code "STATEMENTS"}.
+     *    - either {@code "roots"} or {@code "statements"}or {@code "init"}s.
      * @param type requested method type
      * @param when which kind of event this call site shall trigger
      *    - {@code "enter"} or {@code "return"}
