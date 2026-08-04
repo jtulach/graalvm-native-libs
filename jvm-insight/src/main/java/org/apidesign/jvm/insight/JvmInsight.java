@@ -22,7 +22,6 @@ import java.lang.invoke.ConstantCallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,6 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import org.apidesign.jvm.insight.JvmInsightClassData.Convertor;
 
 /** {@link JvmInsight} allows advanced instrumentation to be applied to
  * classes running inside of the JVM.
@@ -52,7 +50,8 @@ public final class JvmInsight  {
         JvmInsightInitializer.getInstrumentation()
     );
     private final Object instr;
-    private final List<OnLoadClosable> activated = new CopyOnWriteArrayList<>();
+    /** All active hooks created by this JvmInsight instance */
+    private final List<JvmInsightHook> hooks = new CopyOnWriteArrayList<>();
 
     JvmInsight(Object instr) {
         this.instr = instr;
@@ -86,8 +85,8 @@ public final class JvmInsight  {
      *   these insights are to be disabled
      */
     public AutoCloseable onClass(BiConsumer<ClassInfo, Builder> block) {
-        var listener = new OnLoadClosable(null, block);
-        activated.add(listener);
+        var listener = new JvmInsightHook(this, null, block);
+        hooks.add(listener);
         return listener;
     }
 
@@ -106,8 +105,8 @@ public final class JvmInsight  {
      *   these insights are to be disabled
      */
     public AutoCloseable onMethod(BiConsumer<MethodInfo, Builder> block) {
-        var listener = new OnLoadClosable(block, null);
-        activated.add(listener);
+        var listener = new JvmInsightHook(this, block, null);
+        hooks.add(listener);
         return listener;
     }
 
@@ -245,7 +244,7 @@ public final class JvmInsight  {
                 return false;
             }
             var instrument = false;
-            for (var r : insight.activated) {
+            for (var r : insight.hooks) {
                 if (r.instrumentClass(this)) {
                     instrument = true;
                 }
@@ -557,157 +556,6 @@ public final class JvmInsight  {
         public abstract void call(BiConsumer<? super At, Map<String, Object>> handler);
     }
 
-    class OnLoadClosable implements AutoCloseable {
-        private final BiConsumer<MethodInfo, Builder> onMethod;
-        private final BiConsumer<ClassInfo, Builder> onClass;
-        private final List<Convertor> convertors = new ArrayList<>();
-
-        OnLoadClosable(BiConsumer<MethodInfo, Builder> method, BiConsumer<ClassInfo, Builder> clazz) {
-            this.onMethod = method;
-            this.onClass = clazz;
-        }
-
-        public Boolean instrumentClass(ClassInfo info) {
-            var isAppliedBuilder = new Builder() {
-                private boolean activated;
-                @Override
-                public Builder when(When type) {
-                    return this;
-                }
-
-                @Override
-                public Builder roots(boolean roots) {
-                    return this;
-                }
-
-                @Override
-                public Builder statements(boolean statements) {
-                    return this;
-                }
-
-                @Override
-                public void call(BiConsumer<? super At, Map<String, Object>> handler) {
-                    activated = true;
-                }
-
-            };
-            if (onClass != null) {
-                onClass.accept(info, isAppliedBuilder);
-                if (isAppliedBuilder.activated) {
-                    return true;
-                }
-            }
-            if (onMethod != null) {
-                for (var methodInfo : info) {
-                    onMethod.accept(methodInfo, isAppliedBuilder);
-                    if (isAppliedBuilder.activated) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public void close() throws Exception {
-            activated.remove(this);
-            for (var c : convertors) {
-                c.close();
-            }
-        }
-
-        public void register(ClassInfo classInfo, Class<?> clazz) {
-            if (onMethod != null) {
-                for (var t : classInfo) {
-                    var bldr = new OnBuilder(t, clazz);
-                    onMethod.accept(t, bldr);
-                    convertors.addAll(bldr.resetConvertors());
-                }
-            }
-            if (onClass != null) {
-                var bldr = new OnBuilder(null, clazz);
-                onClass.accept(classInfo, bldr);
-                convertors.addAll(bldr.resetConvertors());
-            }
-        }
-    }
-
-    private final static class OnBuilder extends Builder {
-        private final Class<?> clazz;
-        private boolean statements;
-        private boolean roots;
-        private When when = When.ENTER;
-        private final MethodInfo method;
-        /** guarded by this */
-        private List<Convertor> convertors;
-
-        private OnBuilder(MethodInfo method, Class<?> clazz) {
-            this.method = method;
-            this.clazz = clazz;
-        }
-
-        /** Specify when this callback should be triggered.
-         *
-         * @param type on enter or on return?
-         * @return this builder
-         */
-        @Override
-        public Builder when(When type) {
-            Objects.requireNonNull(type);
-            this.when = type;
-            return this;
-        }
-
-        /** Specify whether this callback should be triggered on method enter/exit.
-         *
-         * @param roots specify {@code true} to enable tracking "roots"
-         * @return this builder
-         */
-        @Override
-        public Builder roots(boolean roots) {
-            this.roots = roots;
-            return this;
-        }
-
-        /** Specify whether this callback should be triggered on each line/statement.
-         *
-         * @param statements specify {@code true} to enable tracking "statements"
-         * @return this builder
-         */
-        @Override
-        public Builder statements(boolean statements) {
-            this.statements = true;
-            return this;
-        }
-
-        /** Finishes building a callback. After configuring the builder
-         * options, call this mehtod to register the callback accordingly.
-         *
-         * @param handler a handler to be invoke when an event happens
-         * @return an internal handle representing this callback,
-         *    {@link AutoCloseable#close()} it
-         *    to disassociate call registered by this method
-         */
-        @Override
-        public void call(BiConsumer<? super At, Map<String, Object>> handler) {
-            var data = JvmInsightClassData.find(clazz);
-            var conv = data.register(roots, statements, when, method, handler);
-            synchronized (this) {
-                if (convertors == null) {
-                    convertors = new ArrayList<>();
-                }
-                convertors.add(conv);
-            }
-        }
-
-        final synchronized List<Convertor> resetConvertors() {
-            var prev = convertors;
-            convertors = null;
-            return prev == null ? List.of() : prev;
-        }
-    }
-
-
     /** Creates a dynamically configurable site for JVM Insight. Used by
      * bytecode manipulation transformers that patch methods to be ready for
      * {@link JvmInsight}.
@@ -756,7 +604,7 @@ public final class JvmInsight  {
         var clazz = at.where();
         var insight = find(clazz.getClassLoader());
         var classInfo = JvmInsightClassData.find(clazz).info();
-        for (var registry : insight.activated) {
+        for (var registry : insight.hooks) {
             registry.register(classInfo, clazz);
         }
         return null;
@@ -770,5 +618,9 @@ public final class JvmInsight  {
     private static Consumer<Map<String, Object>> statements(At at) {
         var data = JvmInsightClassData.find(at.where());
         return data.statements(at);
+    }
+
+    final void removeHook(JvmInsightHook hook) {
+        this.hooks.remove(hook);
     }
 }
