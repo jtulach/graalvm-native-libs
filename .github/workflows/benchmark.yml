@@ -31,13 +31,24 @@ jobs:
     - name: jvm-channel mock/hotspot ratios
       run: java .github/scripts/BenchAggregate.java . channel-aggregate.json --no-native
 
-    - name: jvm-interop JMH (reduced)
-      run: java -jar bench/interop/target/bench-interop.jar -wi 2 -i 3 -f 1 -rf json -rff bench/interop/target/jmh-result.json
+    - name: jvm-interop JMH
+      run: java -jar bench/interop/target/bench-interop.jar -rf json -rff bench/interop/target/jmh-result.json
 
-    - name: persist JMH (reduced)
-      run: java -jar bench/persist/target/bench-persist.jar -wi 2 -i 3 -f 1 -rf json -rff bench/persist/target/jmh-result.json
+    - name: persist JMH
+      run: java -jar bench/persist/target/bench-persist.jar -rf json -rff bench/persist/target/jmh-result.json
+
+    - name: Check whether gh-pages has a baseline yet
+      id: gh-pages
+      run: |
+        if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::gh-pages branch does not exist yet, so there is no baseline to compare against. Run this workflow once via workflow_dispatch (not from a PR) to create it - that run pushes the first baseline."
+        fi
 
     - name: Compare jvm-channel ratios against baseline
+      if: steps.gh-pages.outputs.exists == 'true'
       uses: benchmark-action/github-action-benchmark@v1
       with:
         name: 'jvm-channel ratios'
@@ -52,6 +63,7 @@ jobs:
         fail-on-alert: true
 
     - name: Compare jvm-interop JMH against baseline
+      if: steps.gh-pages.outputs.exists == 'true'
       uses: benchmark-action/github-action-benchmark@v1
       with:
         name: 'jvm-interop JMH'
@@ -66,6 +78,7 @@ jobs:
         fail-on-alert: true
 
     - name: Compare persist JMH against baseline
+      if: steps.gh-pages.outputs.exists == 'true'
       uses: benchmark-action/github-action-benchmark@v1
       with:
         name: 'persist JMH'
@@ -101,10 +114,10 @@ jobs:
     - name: Build native-image executables (bench/channel + the examples, for size tracking)
       run: mvn -Pnative -B package --file pom.xml
 
-    - name: jvm-interop JMH (full)
+    - name: jvm-interop JMH
       run: java -jar bench/interop/target/bench-interop.jar -rf json -rff bench/interop/target/jmh-result.json
 
-    - name: persist JMH (full)
+    - name: persist JMH
       run: java -jar bench/persist/target/bench-persist.jar -rf json -rff bench/persist/target/jmh-result.json
 
     - name: jvm-channel ratios + native-image sizes
