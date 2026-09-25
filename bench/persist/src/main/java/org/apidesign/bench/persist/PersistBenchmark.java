@@ -14,16 +14,26 @@
 package org.apidesign.bench.persist;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import org.apidesign.bench.persist.BenchPayloads.Line;
 import org.apidesign.bench.persist.BenchPayloads.Point;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Warmup;
 
-/** Conventional JMH benchmarks over {@code persist}'s serialize/deserialize round trip. */
+/** Conventional JMH benchmarks over {@code persist}'s serialize/deserialize round trip.
+ * {@code @Warmup}/{@code @Measurement}/{@code @Fork} here are the defaults for a bare
+ * {@code java -jar bench-persist.jar} - CI and anyone else can still override them with the
+ * usual {@code -wi}/{@code -i}/{@code -f}/{@code -w}/{@code -r} flags. */
 @State(Scope.Thread)
+@Warmup(iterations = 1, time = 5, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@Fork(1)
 public class PersistBenchmark {
     private Point point;
     private Line line;

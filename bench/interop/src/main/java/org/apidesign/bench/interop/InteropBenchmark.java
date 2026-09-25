@@ -13,24 +13,33 @@
  */
 package org.apidesign.bench.interop;
 
+import java.util.concurrent.TimeUnit;
 import org.apidesign.jvm.interop.OtherJvmClassLoader;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.annotations.Warmup;
 
 /**
  * Rebuilds {@code jvm-interop}'s own {@code OtherJvmObjectTest.checkString}-style comparison
  * (same target class, wrapped two ways, same operations run on both) as JMH benchmarks, using
  * only public API. Both sides run in this one HotSpot JVM: {@code OtherJvmClassLoader.create(null)}
  * is jvm-interop's in-process mock mode, so no native-image build is needed for this comparison.
+ * {@code @Warmup}/{@code @Measurement}/{@code @Fork} are the defaults for a bare
+ * {@code java -jar bench-interop.jar} - override with the usual JMH CLI flags when needed.
  */
 @State(Scope.Thread)
+@Warmup(iterations = 1, time = 5, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@Fork(1)
 public class InteropBenchmark {
     private Context localContext;
     private OtherJvmClassLoader loader;

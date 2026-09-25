@@ -17,12 +17,10 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.apidesign.graalvm</groupId>
-        <artifactId>pom</artifactId>
+        <groupId>org.apidesign.bench</groupId>
+        <artifactId>bench</artifactId>
         <version>2.0-SNAPSHOT</version>
-        <relativePath>../..</relativePath>
     </parent>
-    <groupId>org.apidesign.bench</groupId>
     <artifactId>bench-channel</artifactId>
     <packaging>jar</packaging>
 
@@ -43,13 +41,6 @@
     </dependencies>
     <build>
         <plugins>
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <source>25</source>
-                    <target>25</target>
-                </configuration>
-            </plugin>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
                 <configuration>
@@ -93,17 +84,19 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Not JMH - overrides bench/pom.xml's default exec:exec arguments with this
+                 module's own hand-rolled main class. Mode "mock" is the safe, fast, no-setup
+                 default for `mvn exec:exec`; modes "native"/"hotspot" need explicit args. -->
             <plugin>
-                <artifactId>maven-javadoc-plugin</artifactId>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
                 <configuration>
-                    <skip>true</skip>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <configuration>
-                    <skipPublishing>true</skipPublishing>
+                    <arguments combine.self="override">
+                        <argument>-cp</argument>
+                        <classpath/>
+                        <argument>${exec.mainClass}</argument>
+                        <argument>--mode=mock</argument>
+                    </arguments>
                 </configuration>
             </plugin>
         </plugins>

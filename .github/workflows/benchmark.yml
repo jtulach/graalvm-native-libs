@@ -32,10 +32,10 @@ jobs:
       run: java .github/scripts/BenchAggregate.java . channel-aggregate.json --no-native
 
     - name: jvm-interop JMH
-      run: java -jar bench/interop/target/bench-interop.jar -rf json -rff bench/interop/target/jmh-result.json
+      run: mvn -B exec:exec -f bench/interop
 
     - name: persist JMH
-      run: java -jar bench/persist/target/bench-persist.jar -rf json -rff bench/persist/target/jmh-result.json
+      run: mvn -B exec:exec -f bench/persist
 
     - name: Check whether gh-pages has a baseline yet
       id: gh-pages
@@ -115,10 +115,10 @@ jobs:
       run: mvn -Pnative -B package --file pom.xml
 
     - name: jvm-interop JMH
-      run: java -jar bench/interop/target/bench-interop.jar -rf json -rff bench/interop/target/jmh-result.json
+      run: mvn -B exec:exec -f bench/interop
 
     - name: persist JMH
-      run: java -jar bench/persist/target/bench-persist.jar -rf json -rff bench/persist/target/jmh-result.json
+      run: mvn -B exec:exec -f bench/persist
 
     - name: jvm-channel ratios + native-image sizes
       run: java .github/scripts/BenchAggregate.java . channel-aggregate.json

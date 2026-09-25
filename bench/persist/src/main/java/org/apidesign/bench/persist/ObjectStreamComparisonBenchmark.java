@@ -19,16 +19,23 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Warmup;
 
 /** Same payload shape as {@link PersistBenchmark}'s {@code Point}, benchmarked via plain {@code
  * java.io.ObjectOutputStream}/{@code ObjectInputStream} as a reference point next to the
  * {@code persist} numbers. */
 @State(Scope.Thread)
+@Warmup(iterations = 1, time = 5, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@Fork(1)
 public class ObjectStreamComparisonBenchmark {
     private SerializablePoint point;
     private byte[] pointBytes;

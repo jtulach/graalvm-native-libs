@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.apidesign.graalvm</groupId>
+        <artifactId>pom</artifactId>
+        <version>2.0-SNAPSHOT</version>
+    </parent>
+    <groupId>org.apidesign.bench</groupId>
+    <artifactId>bench</artifactId>
+    <packaging>pom</packaging>
+
+    <name>Benchmarks</name>
+
+    <!--
+        Unlike examples/* (deliberately independent, each its own parent-of-root module - see
+        their own poms), the bench/* modules are one cohesive suite and share this parent on
+        purpose: one place for their common plugin configuration, most notably exec-maven-plugin's
+        default exec:exec arguments below, which is also what NetBeans' Maven support looks for
+        when you right-click a benchmark file and choose Run/Debug.
+    -->
+    <properties>
+        <repoDir>..</repoDir>
+        <jmh.version>1.37</jmh.version>
+        <!-- JMH include-pattern (a regex matched against "Class.method"): the last argument in
+             the exec:exec command below, defaulting to "run everything". A single Maven property
+             only ever fills in as one argv token - not split on spaces the way exec-maven-plugin's
+             own -Dexec.args is - so this covers the one-token case (which benchmark(s) to run),
+             not arbitrary extra flags. Override with e.g.
+             -Dexec.jmhInclude=PersistBenchmark.serializePoint to target one benchmark, without
+             having to also retype the classpath/main-class/output-format wiring - unlike
+             exec-maven-plugin's own -Dexec.args, which replaces the *entire* argument list. -->
+        <exec.jmhInclude>.*</exec.jmhInclude>
+    </properties>
+
+    <modules>
+        <module>channel</module>
+        <module>interop</module>
+        <module>persist</module>
+    </modules>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!--
+                    JMH's own default: <classpath/> is exec-maven-plugin's own parameter type
+                    (not a literal string) resolving to this module's full runtime classpath,
+                    computed by the plugin itself - launching a real, separate `java` process this
+                    way (unlike exec:java, which runs in-process) is what lets JMH's own forking
+                    work correctly; an in-process launcher never gives forked children a usable
+                    classpath. `mvn exec:exec -pl bench/<module>` runs it as configured here;
+                    override just the trailing benchmark filter with -Dexec.jmhInclude=... (see that property's
+                    own comment above for why, over exec-maven-plugin's own -Dexec.args).
+                    bench/channel isn't JMH-based, so it overrides these arguments with its own.
+                -->
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>3.5.0</version>
+                    <configuration>
+                        <executable>java</executable>
+                        <arguments>
+                            <argument>-cp</argument>
+                            <classpath/>
+                            <argument>org.openjdk.jmh.Main</argument>
+                            <argument>-rf</argument>
+                            <argument>json</argument>
+                            <argument>-rff</argument>
+                            <argument>${project.build.directory}/jmh-result.json</argument>
+                            <argument>${exec.jmhInclude}</argument>
+                        </arguments>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <configuration>
+                    <skipPublishing>true</skipPublishing>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
