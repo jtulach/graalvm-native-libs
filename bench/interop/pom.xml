@@ -45,6 +45,12 @@
             <artifactId>truffle-api</artifactId>
             <version>${graalvm.version}</version>
         </dependency>
+        <!-- Need optimizing runtime with Graal compiler, otherwise benchmarks measure interpretation speed. -->
+        <dependency>
+            <groupId>org.graalvm.truffle</groupId>
+            <artifactId>truffle-runtime</artifactId>
+            <version>${graalvm.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
