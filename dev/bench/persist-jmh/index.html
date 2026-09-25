@@ -82,6 +82,12 @@
       .benchmark-chart {
         max-width: 1000px;
       }
+      .group-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        text-align: center;
+        margin: 16px 0 4px;
+      }
     </style>
     <title>Benchmarks</title>
   </head>
@@ -106,175 +112,125 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.2/dist/Chart.min.js"></script>
     <script src="data.js"></script>
-    <script id="main-script">
+    <script>
       'use strict';
       (function() {
-        // Colors from https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
-        const toolColors = {
-          cargo: '#dea584',
-          go: '#00add8',
-          benchmarkjs: '#f1e05a',
-          benchmarkluau: '#000080',
-          pytest: '#3572a5',
-          googlecpp: '#f34b7d',
-          catch2: '#f34b7d',
-          julia: '#a270ba',
-          jmh: '#b07219',
-          benchmarkdotnet: '#178600',
-          customBiggerIsBetter: '#38ff38',
-          customSmallerIsBetter: '#ff3838',
-          _: '#333333'
+        const palette = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#008080', '#9a6324', '#800000', '#808000', '#000075'];
+        const data = window.BENCHMARK_DATA;
+
+        document.getElementById('last-update').textContent = new Date(data.lastUpdate).toString();
+        const repoLink = document.getElementById('repository-link');
+        repoLink.href = data.repoUrl;
+        repoLink.textContent = data.repoUrl;
+        document.getElementById('dl-button').onclick = () => {
+          const a = document.createElement('a');
+          a.href = 'data:,' + encodeURIComponent(JSON.stringify(data, null, 2));
+          a.download = 'benchmark_data.json';
+          a.click();
         };
 
-        function init() {
-          function collectBenchesPerTestCase(entries) {
-            const map = new Map();
-            for (const entry of entries) {
-              const {commit, date, tool, benches} = entry;
-              for (const bench of benches) {
-                const result = { commit, date, tool, bench };
-                const arr = map.get(bench.name);
-                if (arr === undefined) {
-                  map.set(bench.name, [result]);
-                } else {
-                  arr.push(result);
-                }
-              }
-            }
-            return map;
+        // "jvm-channel: mock round trip" -> group "jvm-channel", series "mock round trip"
+        // "org.x.FooBenchmark.channelArrayAccess" -> series "FooBenchmark.channelArrayAccess",
+        // grouped by the part after the first camelCase word ("ArrayAccess") when at least
+        // two benchmarks share it, otherwise by the class.
+        function parse(name) {
+          const colon = name.indexOf(': ');
+          if (colon > 0) {
+            return { group: name.slice(0, colon), series: name.slice(colon + 2), workload: null };
           }
-
-          const data = window.BENCHMARK_DATA;
-
-          // Render header
-          document.getElementById('last-update').textContent = new Date(data.lastUpdate).toString();
-          const repoLink = document.getElementById('repository-link');
-          repoLink.href = data.repoUrl;
-          repoLink.textContent = data.repoUrl;
-
-          // Render footer
-          document.getElementById('dl-button').onclick = () => {
-            const dataUrl = 'data:,' + JSON.stringify(data, null, 2);
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = 'benchmark_data.json';
-            a.click();
-          };
-
-          // Prepare data points for charts
-          return Object.keys(data.entries).map(name => ({
-            name,
-            dataSet: collectBenchesPerTestCase(data.entries[name]),
-          }));
+          const parts = name.split('.');
+          const method = parts.pop();
+          const cls = parts.pop() || '';
+          const m = /^[a-z]+([A-Z].*)$/.exec(method);
+          return { group: cls, series: cls ? cls + '.' + method : method, workload: m ? m[1] : null };
         }
 
-        function renderAllChars(dataSets) {
+        function groupBenches(entries) {
+          const infos = new Map();
+          for (const e of entries) {
+            for (const b of e.benches) {
+              if (!infos.has(b.name)) {
+                infos.set(b.name, Object.assign(parse(b.name), { unit: b.unit }));
+              }
+            }
+          }
+          const workloadCount = new Map();
+          for (const i of infos.values()) {
+            if (i.workload) workloadCount.set(i.workload, (workloadCount.get(i.workload) || 0) + 1);
+          }
+          const groups = new Map();
+          for (const [name, i] of infos) {
+            const title = i.workload && workloadCount.get(i.workload) > 1 ? i.workload : i.group;
+            const key = title + ' [' + i.unit + ']';
+            if (!groups.has(key)) groups.set(key, { title: key, unit: i.unit, series: [] });
+            groups.get(key).series.push({ name, label: i.series });
+          }
+          return [...groups.values()];
+        }
 
-          function renderGraph(parent, name, dataset) {
-            const canvas = document.createElement('canvas');
-            canvas.className = 'benchmark-chart';
-            parent.appendChild(canvas);
-
-            const color = toolColors[dataset.length > 0 ? dataset[0].tool : '_'];
-            const data = {
-              labels: dataset.map(d => d.commit.id.slice(0, 7)),
-              datasets: [
-                {
-                  label: name,
-                  data: dataset.map(d => d.bench.value),
-                  borderColor: color,
-                  backgroundColor: color + '60', // Add alpha for #rrggbbaa
-                }
-              ],
+        function renderChart(parent, group, entries) {
+          const canvas = document.createElement('canvas');
+          canvas.className = 'benchmark-chart';
+          parent.appendChild(canvas);
+          const datasets = group.series.map((s, idx) => {
+            const color = palette[idx % palette.length];
+            return {
+              label: s.label,
+              data: entries.map(e => {
+                const b = e.benches.find(x => x.name === s.name);
+                return b ? b.value : null;
+              }),
+              borderColor: color,
+              backgroundColor: color + '60',
+              fill: false,
+              spanGaps: true,
             };
-            const options = {
+          });
+          new Chart(canvas, {
+            type: 'line',
+            data: { labels: entries.map(e => e.commit.id.slice(0, 7)), datasets },
+            options: {
               scales: {
-                xAxes: [
-                  {
-                    scaleLabel: {
-                      display: true,
-                      labelString: 'commit',
-                    },
-                  }
-                ],
-                yAxes: [
-                  {
-                    scaleLabel: {
-                      display: true,
-                      labelString: dataset.length > 0 ? dataset[0].bench.unit : '',
-                    },
-                    ticks: {
-                      beginAtZero: true,
-                    }
-                  }
-                ],
+                xAxes: [{ scaleLabel: { display: true, labelString: 'commit' } }],
+                yAxes: [{ scaleLabel: { display: true, labelString: group.unit }, ticks: { beginAtZero: true } }],
               },
               tooltips: {
                 callbacks: {
                   afterTitle: items => {
-                    const {index} = items[0];
-                    const data = dataset[index];
-                    return '\n' + data.commit.message + '\n\n' + data.commit.timestamp + ' committed by @' + data.commit.committer.username + '\n';
+                    const c = entries[items[0].index].commit;
+                    return '\n' + c.message + '\n\n' + c.timestamp + ' committed by @' + c.committer.username + '\n';
                   },
-                  label: item => {
-                    let label = item.value;
-                    const { range, unit } = dataset[item.index].bench;
-                    label += ' ' + unit;
-                    if (range) {
-                      label += ' (' + range + ')';
-                    }
-                    return label;
-                  },
-                  afterLabel: item => {
-                    const { extra } = dataset[item.index].bench;
-                    return extra ? '\n' + extra : '';
-                  }
-                }
+                  label: item => datasets[item.datasetIndex].label + ': ' + item.value + ' ' + group.unit,
+                },
               },
-              onClick: (_mouseEvent, activeElems) => {
-                if (activeElems.length === 0) {
-                  return;
-                }
-                // XXX: Undocumented. How can we know the index?
-                const index = activeElems[0]._index;
-                const url = dataset[index].commit.url;
-                window.open(url, '_blank');
+              onClick: (_ev, active) => {
+                if (active.length) window.open(entries[active[0]._index].commit.url, '_blank');
               },
-            };
-
-            new Chart(canvas, {
-              type: 'line',
-              data,
-              options,
-            });
-          }
-
-          function renderBenchSet(name, benchSet, main) {
-            const setElem = document.createElement('div');
-            setElem.className = 'benchmark-set';
-            main.appendChild(setElem);
-
-            const nameElem = document.createElement('h1');
-            nameElem.className = 'benchmark-title';
-            nameElem.textContent = name;
-            setElem.appendChild(nameElem);
-
-            const graphsElem = document.createElement('div');
-            graphsElem.className = 'benchmark-graphs';
-            setElem.appendChild(graphsElem);
-
-            for (const [benchName, benches] of benchSet.entries()) {
-              renderGraph(graphsElem, benchName, benches)
-            }
-          }
-
-          const main = document.getElementById('main');
-          for (const {name, dataSet} of dataSets) {
-            renderBenchSet(name, dataSet, main);
-          }
+            },
+          });
         }
 
-        renderAllChars(init()); // Start
+        const main = document.getElementById('main');
+        for (const name of Object.keys(data.entries)) {
+          const entries = data.entries[name];
+          const setElem = document.createElement('div');
+          setElem.className = 'benchmark-set';
+          main.appendChild(setElem);
+          const h = document.createElement('h1');
+          h.className = 'benchmark-title';
+          h.textContent = name;
+          setElem.appendChild(h);
+          for (const group of groupBenches(entries)) {
+            const t = document.createElement('div');
+            t.className = 'group-title';
+            t.textContent = group.title;
+            setElem.appendChild(t);
+            const graphs = document.createElement('div');
+            graphs.className = 'benchmark-graphs';
+            setElem.appendChild(graphs);
+            renderChart(graphs, group, entries);
+          }
+        }
       })();
     </script>
   </body>
