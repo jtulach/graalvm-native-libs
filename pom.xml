@@ -35,6 +35,9 @@
         <module>examples/jvmlauncher</module>
         <module>examples/jvmchannel</module>
         <module>examples/jvminterop</module>
+        <module>bench/channel</module>
+        <module>bench/interop</module>
+        <module>bench/persist</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
