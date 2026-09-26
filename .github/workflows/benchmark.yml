@@ -1,0 +1,185 @@
+name: Benchmarks
+
+on:
+  pull_request:
+    branches: [ "master" ]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  pr-benchmarks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up GraalVM
+      uses: graalvm/setup-graalvm@v1.6.2
+      with:
+        version: '25.1'
+        distribution: 'graalvm'
+        cache: maven
+
+    - name: Build (no native-image - that's the slow part this cadence keeps off PRs)
+      run: mvn -B install -DskipTests --file pom.xml
+
+    - name: jvm-channel mock/hotspot ratios
+      run: java .github/scripts/BenchAggregate.java . channel-aggregate.json --no-native
+
+    - name: jvm-interop JMH
+      run: mvn -B exec:exec -f bench/interop -Dgraalvm.version=25.1.3
+
+    - name: persist JMH
+      run: mvn -B exec:exec -f bench/persist -Dgraalvm.version=25.1.3
+
+    - name: Check whether gh-pages has a baseline yet
+      id: gh-pages
+      run: |
+        if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::gh-pages branch does not exist yet, so there is no baseline to compare against. Run this workflow once via workflow_dispatch (not from a PR) to create it - that run pushes the first baseline."
+        fi
+
+    - name: Compare jvm-channel ratios against baseline
+      if: steps.gh-pages.outputs.exists == 'true'
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: 'jvm-channel ratios'
+        tool: 'customSmallerIsBetter'
+        output-file-path: channel-aggregate.json
+        benchmark-data-dir-path: dev/bench/channel-ratios
+        gh-pages-branch: gh-pages
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: false
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: true
+
+    - name: Compare jvm-interop JMH against baseline
+      if: steps.gh-pages.outputs.exists == 'true'
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: 'jvm-interop JMH'
+        tool: 'jmh'
+        output-file-path: bench/interop/target/jmh-result.json
+        benchmark-data-dir-path: dev/bench/interop-jmh
+        gh-pages-branch: gh-pages
+        skip-fetch-gh-pages: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: false
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: true
+
+    - name: Compare persist JMH against baseline
+      if: steps.gh-pages.outputs.exists == 'true'
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: 'persist JMH'
+        tool: 'jmh'
+        output-file-path: bench/persist/target/jmh-result.json
+        benchmark-data-dir-path: dev/bench/persist-jmh
+        gh-pages-branch: gh-pages
+        skip-fetch-gh-pages: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: false
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: true
+
+  full-benchmarks:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up GraalVM
+      uses: graalvm/setup-graalvm@v1.6.2
+      with:
+        version: '25.1'
+        distribution: 'graalvm'
+        cache: maven
+
+    - name: Build
+      run: mvn -B install --file pom.xml
+
+    - name: Build native-image executables (bench/channel + the examples, for size tracking)
+      run: mvn -Pnative -B package --file pom.xml
+
+    - name: jvm-interop JMH
+      run: mvn -B exec:exec -f bench/interop -Dgraalvm.version=25.1.3
+
+    - name: persist JMH
+      run: mvn -B exec:exec -f bench/persist -Dgraalvm.version=25.1.3
+
+    - name: jvm-channel ratios + native-image sizes
+      run: java .github/scripts/BenchAggregate.java . channel-aggregate.json
+
+    - name: Publish jvm-channel ratios
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: 'jvm-channel ratios'
+        tool: 'customSmallerIsBetter'
+        output-file-path: channel-aggregate.json
+        benchmark-data-dir-path: dev/bench/channel-ratios
+        gh-pages-branch: gh-pages
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: false
+
+    - name: Publish jvm-interop JMH
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: 'jvm-interop JMH'
+        tool: 'jmh'
+        output-file-path: bench/interop/target/jmh-result.json
+        benchmark-data-dir-path: dev/bench/interop-jmh
+        gh-pages-branch: gh-pages
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: false
+
+    - name: Publish persist JMH
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: 'persist JMH'
+        tool: 'jmh'
+        output-file-path: bench/persist/target/jmh-result.json
+        benchmark-data-dir-path: dev/bench/persist-jmh
+        gh-pages-branch: gh-pages
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: false
+
+    - name: Install grouped-charts index.html on gh-pages
+      run: |
+        git fetch origin gh-pages
+        git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages --detach
+        for d in channel-ratios interop-jmh persist-jmh; do
+          mkdir -p "$RUNNER_TEMP/gh-pages/dev/bench/$d"
+          cp .github/pages/index.html "$RUNNER_TEMP/gh-pages/dev/bench/$d/index.html"
+        done
+        cd "$RUNNER_TEMP/gh-pages"
+        if [ -n "$(git status --porcelain)" ]; then
+          git config user.name "github-action-benchmark"
+          git config user.email "github@users.noreply.github.com"
+          git add dev/bench
+          git commit -m "Update grouped-charts index.html"
+          git push origin HEAD:gh-pages
+        fi
