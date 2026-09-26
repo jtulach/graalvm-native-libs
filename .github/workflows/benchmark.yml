@@ -71,6 +71,7 @@ jobs:
         output-file-path: bench/interop/target/jmh-result.json
         benchmark-data-dir-path: dev/bench/interop-jmh
         gh-pages-branch: gh-pages
+        skip-fetch-gh-pages: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
         auto-push: false
         alert-threshold: '150%'
@@ -86,6 +87,7 @@ jobs:
         output-file-path: bench/persist/target/jmh-result.json
         benchmark-data-dir-path: dev/bench/persist-jmh
         gh-pages-branch: gh-pages
+        skip-fetch-gh-pages: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
         auto-push: false
         alert-threshold: '150%'
