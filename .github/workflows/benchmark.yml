@@ -164,3 +164,20 @@ jobs:
         alert-threshold: '150%'
         comment-on-alert: true
         fail-on-alert: false
+
+    - name: Install grouped-charts index.html on gh-pages
+      run: |
+        git fetch origin gh-pages
+        git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages --detach
+        for d in channel-ratios interop-jmh persist-jmh; do
+          mkdir -p "$RUNNER_TEMP/gh-pages/dev/bench/$d"
+          cp .github/pages/index.html "$RUNNER_TEMP/gh-pages/dev/bench/$d/index.html"
+        done
+        cd "$RUNNER_TEMP/gh-pages"
+        if [ -n "$(git status --porcelain)" ]; then
+          git config user.name "github-action-benchmark"
+          git config user.email "github@users.noreply.github.com"
+          git add dev/bench
+          git commit -m "Update grouped-charts index.html"
+          git push origin HEAD:gh-pages
+        fi
