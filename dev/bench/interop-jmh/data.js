@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790498963268,
+  "lastUpdate": 1790586610519,
   "repoUrl": "https://github.com/jtulach/graalvm-native-libs",
   "entries": {
     "jvm-interop JMH": [
@@ -138,6 +138,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "org.apidesign.bench.interop.InteropBenchmark.localInvokeString",
             "value": 25445194.987973377,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "fb15d1d16c1a891fcfb1d64d4f667df7e4713715",
+          "message": "Initial benchmarking infrastructure (#8)",
+          "timestamp": "2026-09-26T07:29:05Z",
+          "url": "https://github.com/jtulach/graalvm-native-libs/commit/fb15d1d16c1a891fcfb1d64d4f667df7e4713715"
+        },
+        "date": 1790586610035,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.channelArrayAccess",
+            "value": 97373.36385652593,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.channelInvokeString",
+            "value": 307904.95873996336,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.localArrayAccess",
+            "value": 14935243.664647726,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.localInvokeString",
+            "value": 25565038.422733467,
             "unit": "ops/s",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
