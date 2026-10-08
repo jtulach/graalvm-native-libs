@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791365883951,
+  "lastUpdate": 1791452730341,
   "repoUrl": "https://github.com/jtulach/graalvm-native-libs",
   "entries": {
     "jvm-channel ratios": [
@@ -1057,6 +1057,88 @@ window.BENCHMARK_DATA = {
           {
             "name": "image size: demo-jvmlauncher",
             "value": 29231672,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvmchannel",
+            "value": 30280248,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvminterop",
+            "value": 46467640,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "fb15d1d16c1a891fcfb1d64d4f667df7e4713715",
+          "message": "Initial benchmarking infrastructure (#8)",
+          "timestamp": "2026-09-26T07:29:05Z",
+          "url": "https://github.com/jtulach/graalvm-native-libs/commit/fb15d1d16c1a891fcfb1d64d4f667df7e4713715"
+        },
+        "date": 1791452729842,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "jvm-channel: mock round trip",
+            "value": 4677,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: hotspot baseline",
+            "value": 90,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: mock/hotspot ratio",
+            "value": 51,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-channel: native (NI+HotSpot) round trip",
+            "value": 7852,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: native/mock ratio",
+            "value": 1,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-channel: native/hotspot ratio",
+            "value": 87,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-interop: channel/local ratio (invokeString)",
+            "value": 88.94116818819388,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-interop: channel/local ratio (arrayAccess)",
+            "value": 197.3807850368483,
+            "unit": "x"
+          },
+          {
+            "name": "image size: bench-channel",
+            "value": 30280248,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvmlauncher",
+            "value": 29166136,
             "unit": "bytes"
           },
           {
