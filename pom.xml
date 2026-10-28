@@ -41,7 +41,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <repoDir>${basedir}</repoDir>
         <moduleName>${project.name}</moduleName>
-        <graalvm.version>25.0.3</graalvm.version>
+        <graalvm.version>25.4.4.1.1</graalvm.version>
     </properties>
     <licenses>
         <license>

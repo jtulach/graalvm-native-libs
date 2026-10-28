@@ -64,6 +64,19 @@ public class OtherJvmObjectTest {
                             ctx.context().leave();
                         });
     }
+    
+    @Test
+    public void noHostObjectForOtherJvm() throws Exception {
+        var testClassValue = loadOtherJvmClass(OtherClass.class.getName());
+        assertOtherJvmObject("Represents clazz from the other JVM", testClassValue);
+        var bigReal = OtherClass.newBigDecimal("432.322");
+        var localValue = ctx.asValue(bigReal);
+        var otherValue = testClassValue.invokeMember("newBigDecimal", "432.322");
+        assertOtherJvmObject("Represents object from the other JVM", otherValue);
+
+        assertFalse(otherValue.isHostObject(), "Not a host object");
+        assertTrue(localValue.isHostObject(), "Local object has a host object");
+    }
 
     @Test
     public void wrapBigDecimal() throws Exception {
@@ -142,7 +155,11 @@ public class OtherJvmObjectTest {
             var stack = e.getGuestObject().invokeMember("getStackTrace");
             for (var i = 0; i < 5; i++) {
                 var elem = stack.getArrayElement(i);
-                assertEquals(singleStack.get(i).toString(), elem.toString());
+                var elemTxt = elem.toString();
+                if (elemTxt.startsWith("java.base/")) {
+                    elemTxt = elemTxt.substring(10);
+                }
+                assertEquals(singleStack.get(i).toString(), elemTxt);
             }
         }
     }
@@ -242,7 +259,7 @@ public class OtherJvmObjectTest {
 
     private static void assertContains(String message, String subtring) {
         var at = message.indexOf(subtring);
-        assertNotEquals(-1, at);
+        assertNotEquals(-1, at, "Found " + subtring + " in " + message);
     }
 
     @Test
@@ -277,13 +294,13 @@ public class OtherJvmObjectTest {
 
         var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = ctx.unwrapValue(localClass.invokeMember("otherJvmInstances", 1));
-        assertTrue(iop.hasLanguage(local1), "it has language");
-        assertEquals("HostLanguage", iop.getLanguage(local1).getSimpleName());
+        assertTrue(iop.hasLanguageId(local1), "it has language");
+        assertEquals("host", iop.getLanguageId(local1));
 
         var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = ctx.unwrapValue(otherClass.invokeMember("otherJvmInstances", 1));
-        assertTrue(iop.hasLanguage(other1), "it has language");
-        assertEquals("FakeLanguage", iop.getLanguage(other1).getSimpleName());
+        assertTrue(iop.hasLanguageId(other1), "it has language");
+        assertEquals("host", iop.getLanguageId(other1));
     }
 
     @Test
