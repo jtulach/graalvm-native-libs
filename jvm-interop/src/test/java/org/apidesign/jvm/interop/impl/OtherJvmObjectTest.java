@@ -242,7 +242,7 @@ public class OtherJvmObjectTest {
 
     private static void assertContains(String message, String subtring) {
         var at = message.indexOf(subtring);
-        assertNotEquals(-1, at);
+        assertNotEquals(-1, at, "Found " + subtring + " in " + message);
     }
 
     @Test
@@ -277,13 +277,13 @@ public class OtherJvmObjectTest {
 
         var localClass = ctx.asValue(OtherClass.class).getMember("static");
         var local1 = ctx.unwrapValue(localClass.invokeMember("otherJvmInstances", 1));
-        assertTrue(iop.hasLanguage(local1), "it has language");
-        assertEquals("HostLanguage", iop.getLanguage(local1).getSimpleName());
+        assertTrue(iop.hasLanguageId(local1), "it has language");
+        assertEquals("host", iop.getLanguageId(local1));
 
         var otherClass = loadOtherJvmClass(OtherClass.class.getName());
         var other1 = ctx.unwrapValue(otherClass.invokeMember("otherJvmInstances", 1));
-        assertTrue(iop.hasLanguage(other1), "it has language");
-        assertEquals("FakeLanguage", iop.getLanguage(other1).getSimpleName());
+        assertTrue(iop.hasLanguageId(other1), "it has language");
+        assertEquals("host", iop.getLanguageId(other1));
     }
 
     @Test
