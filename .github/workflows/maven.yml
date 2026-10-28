@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ ${{ GRAALVM_VERSION }} ]
+        java: [ ${{ env.GRAALVM_VERSION }} ]
         os: [ ubuntu-24.04, macos-14 ]
         # windows-2022 disabled because of 
         # https://github.com/jtulach/graalvm-native-libs/pull/3#issuecomment-4585601488
