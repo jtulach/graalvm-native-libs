@@ -75,6 +75,8 @@ final class OtherJvmObject implements TruffleObject {
     private static final Message IS_TIME = Message.resolve(InteropLibrary.class, "isTime");
     private static final Message IS_ZONE = Message.resolve(InteropLibrary.class, "isTimeZone");
     private static final Message IS_DURATION = Message.resolve(InteropLibrary.class, "isDuration");
+    private static final Message IS_HOST_OBJECT = Message.resolve(InteropLibrary.class, "isHostObject");
+    private static final Message AS_HOST_OBJECT = Message.resolve(InteropLibrary.class, "asHostObject");
 
     private static final Message FITS_IN_BIG_INTEGER
             = Message.resolve(InteropLibrary.class, "fitsInBigInteger");
@@ -202,6 +204,12 @@ final class OtherJvmObject implements TruffleObject {
             }
             if (GET_LANGUAGE == message) {
                 return channel.getConfig().getLanguage();
+            }
+            if (IS_HOST_OBJECT == message) {
+                return false;
+            }
+            if (AS_HOST_OBJECT == message) {
+                throw UnsupportedMessageException.create();
             }
 
             // proper dispatch to the other JVM

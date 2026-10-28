@@ -64,6 +64,19 @@ public class OtherJvmObjectTest {
                             ctx.context().leave();
                         });
     }
+    
+    @Test
+    public void noHostObjectForOtherJvm() throws Exception {
+        var testClassValue = loadOtherJvmClass(OtherClass.class.getName());
+        assertOtherJvmObject("Represents clazz from the other JVM", testClassValue);
+        var bigReal = OtherClass.newBigDecimal("432.322");
+        var localValue = ctx.asValue(bigReal);
+        var otherValue = testClassValue.invokeMember("newBigDecimal", "432.322");
+        assertOtherJvmObject("Represents object from the other JVM", otherValue);
+
+        assertFalse(otherValue.isHostObject(), "Not a host object");
+        assertTrue(localValue.isHostObject(), "Local object has a host object");
+    }
 
     @Test
     public void wrapBigDecimal() throws Exception {
@@ -142,7 +155,11 @@ public class OtherJvmObjectTest {
             var stack = e.getGuestObject().invokeMember("getStackTrace");
             for (var i = 0; i < 5; i++) {
                 var elem = stack.getArrayElement(i);
-                assertEquals(singleStack.get(i).toString(), elem.toString());
+                var elemTxt = elem.toString();
+                if (elemTxt.startsWith("java.base/")) {
+                    elemTxt = elemTxt.substring(10);
+                }
+                assertEquals(singleStack.get(i).toString(), elemTxt);
             }
         }
     }
