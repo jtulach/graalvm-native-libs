@@ -7,6 +7,10 @@ on:
     branches: [ "master" ]
   workflow_dispatch:
 
+env:
+  GRAALVM_VERSION: '25.4'
+  GRAALVM_LIBS: '25.4.4.1.1'
+
 jobs:
   build:
 
@@ -14,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '25.1' ]
+        java: [ ${{ GRAALVM_VERSION }} ]
         os: [ ubuntu-24.04, macos-14 ]
         # windows-2022 disabled because of 
         # https://github.com/jtulach/graalvm-native-libs/pull/3#issuecomment-4585601488
