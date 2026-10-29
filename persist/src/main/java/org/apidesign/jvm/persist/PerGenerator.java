@@ -101,9 +101,9 @@ final class PerGenerator {
       var os = new ByteArrayOutputStream();
       p.writeInline(obj, new ReferenceOutput(this, os));
       found = new WriteResult(p, this.position);
-      byte[] arr = os.toByteArray();
-      main.write(arr);
-      this.position += arr.length;
+      var length = os.size();
+      os.writeTo(main);
+      this.position += length;
       knownObjects.put(obj, found);
     }
     return found;
