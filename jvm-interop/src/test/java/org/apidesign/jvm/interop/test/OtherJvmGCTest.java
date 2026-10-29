@@ -1,0 +1,255 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apidesign.jvm.interop.test;
+
+import java.io.IOException;
+import org.apidesign.jvm.interop.impl.ContextUtils;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.function.Supplier;
+import org.apidesign.jvm.channel.Channel;
+import org.apidesign.jvm.interop.impl.OtherJvmMessage;
+import org.apidesign.jvm.interop.impl.OtherJvmPool;
+import org.apidesign.jvm.interop.impl.OtherJvmResult;
+import org.graalvm.polyglot.Value;
+
+public class OtherJvmGCTest {
+
+    public static final ContextUtils ctx
+            = ContextUtils.newBuilder("host") // no dynamic languages needed
+                    .build();
+
+    private static Channel<OtherJvmPool> CHANNEL;
+
+    @BeforeAll
+    public static void initializeChannel() {
+        System.setProperty(ContextUtils.DUMP_MESSAGE_PROPERTY, "" + Integer.MAX_VALUE);
+        CHANNEL = Channel.create(null, OtherJvmPool.class);
+        CHANNEL
+                .getConfig()
+                .onEnterLeave(
+                        CHANNEL,
+                        null,
+                        null,
+                        (__) -> {
+                            ctx.context().enter();
+                            return null;
+                        },
+                        (__, ___) -> {
+                            ctx.context().leave();
+                        });
+    }
+
+    public static record Counter(short value) {
+
+        private static short counter;
+        private static Reference<Counter> lastCounted = new WeakReference<>(null);
+
+        public static synchronized Counter readCounter() {
+            var last = lastCounted.get();
+            if (last == null) {
+                last = new Counter(++counter);
+                lastCounted = new WeakReference<>(last);
+            }
+            return last;
+        }
+
+        public static void tryAndFailToGC() throws IOException {
+            assertGC("This should not GC", false, lastCounted::get, null);
+        }
+
+        public static void tryAndSucceedWithGC() throws IOException {
+            assertGC("Now we should GC", true, lastCounted::get, null);
+        }
+
+        public static void emptyCall() {
+        }
+    }
+
+    @Test
+    public void getCounterGCAndGet() throws Exception {
+        var counterClass = loadOtherJvmClass(Counter.class.getName());
+        var counter = counterClass.invokeMember("readCounter");
+        var counterValue = counter.invokeMember("value").asShort();
+
+        counterClass.invokeMember("tryAndFailToGC");
+        var counterSame = counterClass.invokeMember("readCounter");
+        assertEquals(counter, counterSame);
+
+        counter = null;
+        counterSame = null;
+        globalFlush
+                = () -> {
+                    counterClass.invokeMember("emptyCall");
+                };
+
+        counterClass.invokeMember("tryAndSucceedWithGC");
+
+        var counterDifferent = counterClass.invokeMember("readCounter");
+        assertNotEquals(counter, counterDifferent);
+
+        var counterDifferentValue = counterDifferent.invokeMember("value");
+        assertEquals(counterValue + 1, counterDifferentValue.asShort());
+    }
+
+    public static final class Obj {
+
+        final Holder hold;
+        final int id;
+
+        private Obj(Holder hold, int id) {
+            this.hold = hold;
+            this.id = id;
+        }
+
+        public Holder toHolder() {
+            return hold;
+        }
+    }
+
+    public static final class Holder {
+
+        private final Reference<Obj> ref;
+
+        private Holder(Obj[] res, int id) {
+            res[0] = new Obj(this, id);
+            this.ref = new WeakReference<>(res[0]);
+        }
+
+        public final Obj toObj() {
+            return ref.get();
+        }
+
+        public final void flush() {
+        }
+
+        @Override
+        public String toString() {
+            return "Holder{" + "ref=" + toObj() + '}';
+        }
+    }
+
+    public static Obj holdObj(int v) {
+        var arr = new Obj[1];
+        var h = new Holder(arr, v);
+        assert h.toObj() == arr[0];
+        return arr[0];
+    }
+
+    public static Reference<Class<OtherJvmGCTest>> getClassReference() {
+        return new WeakReference<>(OtherJvmGCTest.class);
+    }
+
+    @Test
+    public void testGCBehavior() throws Exception {
+        var gcClass = loadOtherJvmClass(OtherJvmGCTest.class.getName());
+        var holdValue = assertHolderHolds(gcClass);
+        assertGC("Now it the objValue shall be GCed", true, holdValue, "toObj", "flush");
+    }
+
+    private Value assertHolderHolds(Value gcClass) throws IOException {
+        var objValue = gcClass.invokeMember("holdObj", 34);
+        var holdValue = objValue.invokeMember("toHolder");
+        assertGC("Cannot GC as we have a reference to objValue", false, holdValue, "toObj", "flush");
+
+        var ref = new WeakReference<>(ctx.unwrapValue(objValue));
+        objValue = null;
+        assertGC("The raw objValue must be gone as well", true, ref::get, null);
+
+        return holdValue;
+    }
+
+    @Test
+    public void testClassCannotBeGCed() throws Exception {
+        var gcClass = loadOtherJvmClass(OtherJvmGCTest.class.getName());
+        var refClass = gcClass.invokeMember("getClassReference");
+        assertGC("Class cannot GC", false, refClass, "get", "get");
+    }
+
+    private static Value loadOtherJvmClass(String name) throws Exception {
+        var msg = new OtherJvmMessage.LoadClass(name);
+        var raw = CHANNEL.execute(OtherJvmResult.class, msg).value(null);
+        ctx.assertChannel(raw, CHANNEL);
+        var value = ctx.asValue(raw);
+        return value;
+    }
+
+    private static Runnable globalFlush;
+
+    private static void assertGC(
+        String msg, boolean expectGC, Value ref, String methodName, String flushName
+    ) throws IOException {
+        assertGC(
+            msg,
+            expectGC,
+            () -> {
+                var value = ref.invokeMember(methodName);
+                return value.isNull() ? null : ctx.unwrapValue(value);
+            },
+            () -> {
+                ref.invokeMember(flushName);
+            }
+        );
+    }
+
+    private static void assertGC(String msg, boolean expectGC, Supplier<?> ref, Runnable flush) throws IOException {
+        var alloc = new ArrayList<byte[]>();
+        var log = new StringBuilder();
+        for (var i = 1; i < Integer.MAX_VALUE / 2; i *= 2) {
+            if (isNull(ref, log)) {
+                break;
+            }
+            System.gc();
+            log.append("assertGC: System.gc - done\n");
+            if (flush != null) {
+                flush.run();
+                log.append("assertGC: Flushed via ").append(flush).append("\n");
+            }
+            if (globalFlush != null) {
+                log.append("assertGC: Flushed global via ").append(globalFlush).append("\n");
+                globalFlush.run();
+            }
+            log.append("assertGC: Allocating ").append(i).append(" byte array\n");
+            try {
+                alloc.add(new byte[i]);
+            } catch (OutOfMemoryError err) {
+                System.gc();
+                log.append("assertGC: OutOfMemoryError: ").append(err.getMessage());
+            }
+        }
+        if (expectGC) {
+            log.append("assertGC: Allocated: ");
+            for (var arr : alloc) {
+                log.append("byte[").append(arr.length).append("] ");
+            }
+            assertNull(ref.get(), msg + " ref still alive. Log:\n" + log);
+        } else {
+            assertNotNull(ref.get(), msg + " ref has been cleaned");
+        }
+    }
+
+    private static boolean isNull(Supplier<?> ref, Appendable log) throws IOException {
+        var value = ref.get();
+        log.append("isNull: " + value + "\n");
+        return value == null;
+    }
+}

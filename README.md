@@ -44,11 +44,11 @@ and is executed, it starts in _native mode_, but if `--jvm` flag is present, it 
 specified by the `JAVA_HOME` environment variable:
 
 ```bash
-$ ./target/jvmlauncher
+$ ./target/demo-jvmlauncher
 Running in: Substrate VM
 
 $ export JAVA_HOME=/jdk-11/
-$ ./target/jvmlauncher --jvm
+$ ./target/demo-jvmlauncher --jvm
 Running in: OpenJDK 64-Bit Server VM
 ```
 
@@ -73,3 +73,16 @@ Define your own custom messages like `RequestFactorial` and responses like `Repo
 and exchange them between the JVMs!
 Details are available in a [separate document](examples/jvmchannel/README.md)
 including a sample project to execute.
+
+## Interop Between the JVMs
+
+Exchanging messages between the JVMs (as described in previous section) is
+powerful, but sometimes tedious to implement. As such there is another
+subproject [jvm-interop](jvm-interop) that makes it even easier.
+
+Launch your  HotSpot
+[JVM](http://hudson.apidesign.org/job/graalvm-native-libs/12/javadoc/org.apidesign.jvm.channel/org/apidesign/jvm/channel/JVM.html)
+in the same process and then create a `loader` to load classes
+(represented as `org.graalvm.polyglot.Value`) from that JVM.
+
+More details is available in a [separate document](examples/jvminterop/README.md).

@@ -23,7 +23,7 @@
         <relativePath>../..</relativePath>
     </parent>
     <groupId>org.apidesign.demo</groupId>
-    <artifactId>jvmchannel</artifactId>
+    <artifactId>demo-jvmchannel</artifactId>
     <packaging>jar</packaging>
 
     <name>Example: Channel Between JVMs</name>
@@ -96,6 +96,7 @@
                         <configuration>
                             <mainClass>${exec.mainClass}</mainClass>
                                 <buildArgs>
+                                    <arg>-Ob</arg>
                                     <arg>-ea</arg>
                                     <arg>-H:+UnlockExperimentalVMOptions</arg>
                                     <arg>-H:+JDWP</arg>

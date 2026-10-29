@@ -30,12 +30,12 @@ public class LaunchJvmTest {
         var loc = LaunchJvmTest.class.getProtectionDomain().getCodeSource().getLocation().toURI();
         var dir = new File(loc);
         while (dir != null) {
-            var win = new File(dir, "jvmlauncher.exe");
+            var win = new File(dir, "demo-jvmlauncher.exe");
             if (win.canExecute() && !win.isDirectory()) {
                 prog = win;
                 break;
             }
-            var unix = new File(dir, "jvmlauncher");
+            var unix = new File(dir, "demo-jvmlauncher");
             if (unix.canExecute() && !unix.isDirectory()) {
                 prog = unix;
                 break;
@@ -43,7 +43,7 @@ public class LaunchJvmTest {
             dir = dir.getParentFile();
         }
 
-        assertTrue(prog != null && prog.canExecute(), "Cannot find jvmlauncher executable searching from " + loc);
+        assertTrue(prog != null && prog.canExecute(), "Cannot find demo-jvmlauncher executable searching from " + loc);
     }
 
     @Test
@@ -58,6 +58,30 @@ public class LaunchJvmTest {
         var openJDK = output.contains("OpenJDK"); // OpenJDK 64-Bit Server VM
         var hotSpot = output.contains("HotSpot"); // Java HotSpot(TM) 64-Bit Server VM
         assertTrue(openJDK || hotSpot, "Expecting HotSpot VM, but was: " + output);
+    }
+
+    @Test
+    public void executeNativeExeWithBrokenClasspath() throws Exception {
+        var pb = new ProcessBuilder(prog.getAbsolutePath(), "--jvm");
+        pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
+        pb.environment().put("CP", "broken_class_path");
+        var proc = pb.start();
+        assertEquals(1, proc.waitFor(), "Executing " + prog + " fails");
+        var output = new StringBuilder();
+        try (var r = new BufferedReader(new InputStreamReader(proc.getErrorStream()))) {
+            for (;;) {
+                var line = r.readLine();
+                if (line == null) {
+                    break;
+                }
+                if (output.length() > 0) {
+                    output.append("\n");
+                }
+                output.append(line);
+            }
+        }
+        var warns = output.indexOf("java.lang.ClassNotFoundException: org/apidesign/demo/jvmlauncher/LaunchJvm") >= 0;
+        assertTrue(warns, "Expecting exception: " + output);
     }
 
     private static String executeProg(String... args) throws IOException, InterruptedException {

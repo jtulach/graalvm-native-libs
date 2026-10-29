@@ -29,12 +29,12 @@ public class ChannelForFactorialTest {
         var loc = ChannelForFactorialTest.class.getProtectionDomain().getCodeSource().getLocation().toURI();
         var dir = new File(loc);
         while (dir != null) {
-            var win = new File(dir, "jvmchannel.exe");
+            var win = new File(dir, "demo-jvmchannel.exe");
             if (win.canExecute() && !win.isDirectory()) {
                 prog = win;
                 break;
             }
-            var unix = new File(dir, "jvmchannel");
+            var unix = new File(dir, "demo-jvmchannel");
             if (unix.canExecute() && !unix.isDirectory()) {
                 prog = unix;
                 break;
@@ -42,7 +42,7 @@ public class ChannelForFactorialTest {
             dir = dir.getParentFile();
         }
 
-        assertTrue(prog != null && prog.canExecute(), "Cannot find jvmchannel executable searching from " + loc);
+        assertTrue(prog != null && prog.canExecute(), "Cannot find demo-jvmchannel executable searching from " + loc);
     }
 
     @Test

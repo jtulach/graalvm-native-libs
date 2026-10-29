@@ -107,6 +107,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
         this.channelClass = handleClass;
         this.channelHandle = handleFn;
         this.otherMockChannel = null;
+        data.withChannel(this);
     }
 
     /**
@@ -138,6 +139,7 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                             ValueLayout.JAVA_LONG);
             this.callbackFn = Linker.nativeLinker().downcallHandle(fnCallbackAddress, fnDescriptor);
         }
+        this.data.withChannel(this);
     }
 
     /**
@@ -162,6 +164,8 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                         ? otherOrNull // use other channel when provided
                         : // otherwise allocate new and pass this reference to it
                         new Channel<>(TYPE_MOCK_SLAVE, otherData, this, null, id);
+
+        this.data.withChannel(this);
     }
 
     /**
@@ -628,6 +632,15 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
          * Subclasses must have {@code public} default constructor.
          */
         protected Config() {
+        }
+
+        /** Associates the config with its channel. Does nothing. Allows
+         * subclasses to get a hold on their channel.
+         *
+         * @param channel the associated channel
+         * @since 1.1
+         */
+        protected void withChannel(Channel<?> channel) {
         }
 
         /**

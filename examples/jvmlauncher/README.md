@@ -15,9 +15,9 @@ graalvm-native-libs$ cd examples/jvmlauncher
 jvmlauncher$ mvn -Pnative package
 ```
 Such a compilation turns [LaunchJvm Java file](./src/main/java/org/apidesign/demo/jvmlauncher/LaunchJvm.java)
-into a native executable `./target/jvmlauncher`. Now we can test it:
+into a native executable `./target/demo-jvmlauncher`. Now we can test it:
 ```
-jvmlauncher$ ./target/jvmlauncher
+jvmlauncher$ ./target/demo-jvmlauncher
 Running in: Substrate VM
 
 ./target/jvmlauncher --jvm
