@@ -54,15 +54,15 @@ public class BenchAggregate {
         var channelDir = repoRoot.resolve("bench/channel");
         var jar = channelDir.resolve("target/bench-channel.jar");
 
-        var mockMedian = medianOf(runChannelMode(channelDir, jar, "mock", 5, 1000, 3000));
-        var hotspotMedian = medianOf(runChannelMode(channelDir, jar, "hotspot", 5, 1000, 3000));
+        var mockMedian = medianOf(runChannelMode(channelDir, jar, "mock", 5));
+        var hotspotMedian = medianOf(runChannelMode(channelDir, jar, "hotspot", 5));
         entries.add(new Entry("jvm-channel: mock round trip", "ns", mockMedian));
         entries.add(new Entry("jvm-channel: hotspot baseline", "ns", hotspotMedian));
         entries.add(new Entry("jvm-channel: mock/hotspot ratio", "x", mockMedian / hotspotMedian));
 
         if (includeNative) {
             var nativeExe = channelDir.resolve("target/bench-channel");
-            var nativeMedian = medianOf(runChannelMode(channelDir, nativeExe, "native", 5, 100, 300));
+            var nativeMedian = medianOf(runChannelMode(channelDir, nativeExe, "native", 5));
             entries.add(new Entry("jvm-channel: native (NI+HotSpot) round trip", "ns", nativeMedian));
             entries.add(new Entry("jvm-channel: native/mock ratio", "x", nativeMedian / mockMedian));
             entries.add(new Entry("jvm-channel: native/hotspot ratio", "x", nativeMedian / hotspotMedian));
@@ -70,7 +70,7 @@ public class BenchAggregate {
     }
 
     private static List<Long> runChannelMode(
-            Path channelDir, Path executable, String mode, int repeats, int warmup, int iterations)
+            Path channelDir, Path executable, String mode, int repeats)
             throws IOException, InterruptedException {
         if (!Files.exists(executable)) {
             throw new IllegalStateException("Missing " + executable + " - build it first");
@@ -85,8 +85,6 @@ public class BenchAggregate {
             }
             cmd.add(executable.toString());
             cmd.add("--mode=" + mode);
-            cmd.add("--warmup=" + warmup);
-            cmd.add("--iterations=" + iterations);
             var process = new ProcessBuilder(cmd).directory(channelDir.toFile()).start();
             var stdout = new String(process.getInputStream().readAllBytes());
             var stderr = new String(process.getErrorStream().readAllBytes());

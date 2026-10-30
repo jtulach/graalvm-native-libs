@@ -40,6 +40,7 @@ public final class ChannelBenchmarkMain {
 
     public static void main(String[] args) throws Exception {
         var opts = Options.parse(args);
+        System.err.println(opts.toString());
         var result = switch (opts.mode()) {
             case "native" -> runNative(opts);
             case "mock" -> runMock(opts);
@@ -120,8 +121,8 @@ public final class ChannelBenchmarkMain {
         static Options parse(String[] args) {
             var mode = "mock";
             var n = 10L;
-            var warmup = 2000;
-            var iterations = 5000;
+            var warmup = 200_000;
+            var iterations = 5_000_000;
             String out = null;
             for (var a : args) {
                 if (a.startsWith("--mode=")) {
@@ -139,6 +140,11 @@ public final class ChannelBenchmarkMain {
                 }
             }
             return new Options(mode, n, warmup, iterations, out);
+        }
+
+        @Override
+        public String toString() {
+            return "Options{" + "mode=" + mode + ", n=" + n + ", warmup=" + warmup + ", iterations=" + iterations + '}';
         }
     }
 
