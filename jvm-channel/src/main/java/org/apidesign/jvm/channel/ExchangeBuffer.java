@@ -157,16 +157,23 @@ permits ExchangeBuffer.ViaMalloc, ExchangeBuffer.ViaBufferSegment, ExchangeBuffe
 
     private static final class ViaMalloc extends ExchangeBuffer {
         private ByteBuffer currentBuffer;
+        private int currentSize;
         private PointerBase currentPointer = WordFactory.nullPointer();
 
         @Override
         public ByteBuffer realloc(int size) {
             if (currentBuffer != null) {
-                currentPointer = UnmanagedMemory.realloc(currentPointer, WordFactory.unsigned(size));
-                currentBuffer = asNativeByteBuffer(currentPointer, size);
+                if (currentSize != size) {
+                    currentPointer = UnmanagedMemory.realloc(currentPointer, WordFactory.unsigned(size));
+                    currentBuffer = asNativeByteBuffer(currentPointer, size);
+                    currentSize = size;
+                } else {
+                    currentBuffer.clear();
+                }
             } else {
                 currentPointer = UnmanagedMemory.malloc(size);
                 currentBuffer = asNativeByteBuffer(currentPointer, size);
+                currentSize = size;
             }
             return currentBuffer;
         }
