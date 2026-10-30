@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793352115967,
+  "lastUpdate": 1793376448168,
   "repoUrl": "https://github.com/jtulach/graalvm-native-libs",
   "entries": {
     "jvm-channel ratios": [
@@ -2195,6 +2195,88 @@ window.BENCHMARK_DATA = {
           {
             "name": "jvm-interop: channel/local ratio (arrayAccess)",
             "value": 176.55132214059492,
+            "unit": "x"
+          },
+          {
+            "name": "image size: bench-channel",
+            "value": 22415928,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvmlauncher",
+            "value": 21301816,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvmchannel",
+            "value": 22284856,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvminterop",
+            "value": 34933304,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "committer": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "id": "efa58e7272d538c0541a405573395f3f4de6b64e",
+          "message": "Increase the default number of iterations otherwise JVM initialization dominates the wall clock time",
+          "timestamp": "2026-10-30T15:58:24Z",
+          "url": "https://github.com/jtulach/graalvm-native-libs/commit/efa58e7272d538c0541a405573395f3f4de6b64e"
+        },
+        "date": 1793376447054,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "jvm-channel: mock round trip",
+            "value": 30,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: hotspot baseline",
+            "value": 20,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: mock/hotspot ratio",
+            "value": 1,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-channel: native (NI+HotSpot) round trip",
+            "value": 131,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: native/mock ratio",
+            "value": 4,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-channel: native/hotspot ratio",
+            "value": 6,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-interop: channel/local ratio (invokeString)",
+            "value": 74.79104044739508,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-interop: channel/local ratio (arrayAccess)",
+            "value": 144.44464063348934,
             "unit": "x"
           },
           {
