@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.function.LongUnaryOperator;
+
 import org.apidesign.jvm.channel.Channel;
 import org.apidesign.jvm.channel.JVM;
 import org.graalvm.nativeimage.ImageInfo;
@@ -170,7 +171,6 @@ public final class ChannelBenchmarkMain {
             json.append("\"n\":").append(opts.n()).append(',');
             json.append("\"iterations\":").append(sorted.length).append(',');
             json.append("\"meanNanos\":").append(mean).append(',');
-            json.append("\"medianNanos\":").append(sorted[sorted.length / 2]).append(',');
             json.append("\"stddevNanos\":").append(stddev).append(',');
             json.append("\"minNanos\":").append(sorted[0]).append(',');
             json.append("\"maxNanos\":").append(sorted[sorted.length - 1]);

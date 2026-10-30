@@ -55,29 +55,29 @@ public class BenchAggregate {
         var channelDir = repoRoot.resolve("bench/channel");
         var jar = channelDir.resolve("target/bench-channel.jar");
 
-        var mockMedian = medianOf(runChannelMode(channelDir, jar, "mock", 5));
-        var hotspotMedian = medianOf(runChannelMode(channelDir, jar, "hotspot", 5));
-        entries.add(new Entry("jvm-channel: mock round trip", "ns", mockMedian));
-        entries.add(new Entry("jvm-channel: hotspot baseline", "ns", hotspotMedian));
-        entries.add(new Entry("jvm-channel: mock/hotspot ratio", "x", ((double)mockMedian) / hotspotMedian));
+        var mockAvg = meanOf(runChannelMode(channelDir, jar, "mock", 5));
+        var hotspotAvg = meanOf(runChannelMode(channelDir, jar, "hotspot", 5));
+        entries.add(new Entry("jvm-channel: mock round trip", "ns", mockAvg));
+        entries.add(new Entry("jvm-channel: hotspot baseline", "ns", hotspotAvg));
+        entries.add(new Entry("jvm-channel: mock/hotspot ratio", "x", ((double)mockAvg) / hotspotAvg));
 
         if (includeNative) {
             var nativeExe = channelDir.resolve("target/bench-channel");
-            var nativeMedian = medianOf(runChannelMode(channelDir, nativeExe, "native", 5));
-            entries.add(new Entry("jvm-channel: native (NI+HotSpot) round trip", "ns", nativeMedian));
-            entries.add(new Entry("jvm-channel: native/mock ratio", "x", ((double)nativeMedian) / mockMedian));
-            entries.add(new Entry("jvm-channel: native/hotspot ratio", "x", ((double)nativeMedian) / hotspotMedian));
+            var nativeAvg = meanOf(runChannelMode(channelDir, nativeExe, "native", 5));
+            entries.add(new Entry("jvm-channel: native (NI+HotSpot) round trip", "ns", nativeAvg));
+            entries.add(new Entry("jvm-channel: native/mock ratio", "x", ((double)nativeAvg) / mockAvg));
+            entries.add(new Entry("jvm-channel: native/hotspot ratio", "x", ((double)nativeAvg) / hotspotAvg));
         }
     }
 
-    private static List<Long> runChannelMode(
+    private static List<Double> runChannelMode(
             Path channelDir, Path executable, String mode, int repeats)
             throws IOException, InterruptedException {
         if (!Files.exists(executable)) {
             throw new IllegalStateException("Missing " + executable + " - build it first");
         }
         var isJar = executable.toString().endsWith(".jar");
-        var medians = new ArrayList<Long>();
+        var means = new ArrayList<Double>();
         for (var i = 0; i < repeats; i++) {
             var cmd = new ArrayList<String>();
             var javaHome = new File(System.getProperty("java.home"));
@@ -98,9 +98,11 @@ public class BenchAggregate {
             if (exit != 0) {
                 throw new IllegalStateException("--mode=" + mode + " failed (exit " + exit + "): " + stderr);
             }
-            medians.add(extractLong(stdout, "medianNanos"));
+            means.add(extractLong(stdout, "meanNanos"));
+            System.err.println("$ " + String.join(" ", cmd));
+            System.err.println(stdout);
         }
-        return medians;
+        return means;
     }
 
     // --- bench/interop: ratios read straight out of its own JMH JSON output ---
@@ -177,18 +179,18 @@ public class BenchAggregate {
 
     // --- shared helpers ---
 
-    private static long medianOf(List<Long> values) {
+    private static double meanOf(List<Double> values) {
         var sorted = new ArrayList<>(values);
         Collections.sort(sorted);
         return sorted.get(sorted.size() / 2);
     }
 
-    private static long extractLong(String json, String field) {
+    private static double extractLong(String json, String field) {
         var matcher = Pattern.compile("\"" + field + "\":([0-9]+)").matcher(json);
         if (!matcher.find()) {
             throw new IllegalStateException("Missing \"" + field + "\" in: " + json);
         }
-        return Long.parseLong(matcher.group(1));
+        return Double.parseDouble(matcher.group(1));
     }
 
     private record Entry(String name, String unit, double value) {
