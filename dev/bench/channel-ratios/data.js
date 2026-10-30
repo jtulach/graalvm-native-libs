@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793343853529,
+  "lastUpdate": 1793344958404,
   "repoUrl": "https://github.com/jtulach/graalvm-native-libs",
   "entries": {
     "jvm-channel ratios": [
@@ -2031,6 +2031,88 @@ window.BENCHMARK_DATA = {
           {
             "name": "jvm-interop: channel/local ratio (arrayAccess)",
             "value": 111.13479875728102,
+            "unit": "x"
+          },
+          {
+            "name": "image size: bench-channel",
+            "value": 22415928,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvmlauncher",
+            "value": 21301816,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvmchannel",
+            "value": 22284856,
+            "unit": "bytes"
+          },
+          {
+            "name": "image size: demo-jvminterop",
+            "value": 34933304,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "committer": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "id": "4ba69bed7065129709dbbbd381e78e0c9e33e0ea",
+          "message": "Avoid realloc when the size matches",
+          "timestamp": "2026-10-30T06:33:46Z",
+          "url": "https://github.com/jtulach/graalvm-native-libs/commit/4ba69bed7065129709dbbbd381e78e0c9e33e0ea"
+        },
+        "date": 1793344957518,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "jvm-channel: mock round trip",
+            "value": 2187,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: hotspot baseline",
+            "value": 97,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: mock/hotspot ratio",
+            "value": 22,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-channel: native (NI+HotSpot) round trip",
+            "value": 11491,
+            "unit": "ns"
+          },
+          {
+            "name": "jvm-channel: native/mock ratio",
+            "value": 5,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-channel: native/hotspot ratio",
+            "value": 118,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-interop: channel/local ratio (invokeString)",
+            "value": 74.54608337399186,
+            "unit": "x"
+          },
+          {
+            "name": "jvm-interop: channel/local ratio (arrayAccess)",
+            "value": 139.67066208890702,
             "unit": "x"
           },
           {
