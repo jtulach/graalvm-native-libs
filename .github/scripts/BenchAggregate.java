@@ -18,6 +18,7 @@
 // JSON output, and records native-image binary sizes - emitting one customSmallerIsBetter JSON
 // array that github-action-benchmark can track.
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,14 +59,14 @@ public class BenchAggregate {
         var hotspotMedian = medianOf(runChannelMode(channelDir, jar, "hotspot", 5));
         entries.add(new Entry("jvm-channel: mock round trip", "ns", mockMedian));
         entries.add(new Entry("jvm-channel: hotspot baseline", "ns", hotspotMedian));
-        entries.add(new Entry("jvm-channel: mock/hotspot ratio", "x", mockMedian / hotspotMedian));
+        entries.add(new Entry("jvm-channel: mock/hotspot ratio", "x", ((double)mockMedian) / hotspotMedian));
 
         if (includeNative) {
             var nativeExe = channelDir.resolve("target/bench-channel");
             var nativeMedian = medianOf(runChannelMode(channelDir, nativeExe, "native", 5));
             entries.add(new Entry("jvm-channel: native (NI+HotSpot) round trip", "ns", nativeMedian));
-            entries.add(new Entry("jvm-channel: native/mock ratio", "x", nativeMedian / mockMedian));
-            entries.add(new Entry("jvm-channel: native/hotspot ratio", "x", nativeMedian / hotspotMedian));
+            entries.add(new Entry("jvm-channel: native/mock ratio", "x", ((double)nativeMedian) / mockMedian));
+            entries.add(new Entry("jvm-channel: native/hotspot ratio", "x", ((double)nativeMedian) / hotspotMedian));
         }
     }
 
@@ -79,13 +80,18 @@ public class BenchAggregate {
         var medians = new ArrayList<Long>();
         for (var i = 0; i < repeats; i++) {
             var cmd = new ArrayList<String>();
+            var javaHome = new File(System.getProperty("java.home"));
             if (isJar) {
-                cmd.add("java");
+                var javaBin = new File(javaHome, "bin");
+                var javaExe = new File(javaBin, "java");
+                cmd.add(javaExe.getPath());
                 cmd.add("-jar");
             }
             cmd.add(executable.toString());
             cmd.add("--mode=" + mode);
-            var process = new ProcessBuilder(cmd).directory(channelDir.toFile()).start();
+            var pb = new ProcessBuilder(cmd).directory(channelDir.toFile());
+            pb.environment().put("JAVA_HOME", javaHome.getPath());
+            var process = pb.start();
             var stdout = new String(process.getInputStream().readAllBytes());
             var stderr = new String(process.getErrorStream().readAllBytes());
             var exit = process.waitFor();
