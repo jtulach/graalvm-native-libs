@@ -29,7 +29,6 @@ import org.graalvm.nativeimage.CurrentIsolate;
 import org.graalvm.nativeimage.ImageInfo;
 import org.graalvm.nativeimage.IsolateThread;
 import org.graalvm.nativeimage.StackValue;
-import org.graalvm.nativeimage.UnmanagedMemory;
 import org.graalvm.nativeimage.c.function.CEntryPoint;
 import org.graalvm.nativeimage.c.function.CEntryPointLiteral;
 import org.graalvm.nativeimage.c.function.CFunctionPointer;
@@ -454,81 +453,6 @@ public final class Channel<Data extends Channel.Config> implements AutoCloseable
                 fn.getReleaseStringUTFChars().call(e, msg, cStr);
                 throw new IllegalStateException(javaMsg);
             }
-        }
-    }
-
-    private static interface ExchangeBuffer extends AutoCloseable {
-        static ExchangeBuffer create(boolean useMalloc) {
-            return useMalloc ? new ExchangeBufferMalloc() : new ExchangeBufferSegment();
-        }
-
-        ByteBuffer realloc(int size);
-        @Override
-        void close();
-        long address();
-        ByteBuffer wrap(long addr, int size);
-    }
-
-    private static final class ExchangeBufferMalloc implements ExchangeBuffer {
-        private ByteBuffer currentBuffer;
-        private PointerBase currentPointer = WordFactory.nullPointer();
-
-        @Override
-        public ByteBuffer realloc(int size) {
-            if (currentBuffer != null) {
-                currentPointer = UnmanagedMemory.realloc(currentPointer, WordFactory.unsigned(size));
-                currentBuffer = asNativeByteBuffer(currentPointer, size);
-            } else {
-                currentPointer = UnmanagedMemory.malloc(size);
-                currentBuffer = asNativeByteBuffer(currentPointer, size);
-            }
-            return currentBuffer;
-        }
-
-        @Override
-        public long address() {
-            return currentPointer.rawValue();
-        }
-
-        @Override
-        public ByteBuffer wrap(long addr, int len) {
-            var ptr = WordFactory.pointer(addr);
-            var buf = CTypeConversion.asByteBuffer(ptr, len);
-            return buf.order(ByteOrder.BIG_ENDIAN);
-        }
-
-        @Override
-        public void close() {
-            if (currentBuffer != null) {
-                UnmanagedMemory.free(currentPointer);
-            }
-        }
-    }
-    private static final class ExchangeBufferSegment implements ExchangeBuffer {
-        private ByteBuffer currentBuffer;
-        private MemorySegment currentAddress;
-
-        @Override
-        public ByteBuffer realloc(int size) {
-            currentBuffer = ByteBuffer.allocateDirect(size);
-            currentAddress = MemorySegment.ofBuffer(currentBuffer);
-            return currentBuffer;
-        }
-
-        @Override
-        public long address() {
-            return currentAddress.address();
-        }
-
-        @Override
-        public final ByteBuffer wrap(long addr, int len) {
-            var seg = MemorySegment.ofAddress(addr).reinterpret(len);
-            return seg.asByteBuffer();
-        }
-
-        @Override
-        public void close() {
-            // rely on GC
         }
     }
 
