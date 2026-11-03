@@ -11,6 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Offers {@link org.apidesign.jvm.interop.OtherJvmClassLoader class loader}
+ * to access classes loaded from the <strong>other JVM</strong> via
+ * {@link org.apidesign.jvm.channel.Channel} easily.
+ */
 module org.apidesign.jvm.interop {
     requires org.apidesign.jvm.channel;
     requires org.graalvm.truffle;
