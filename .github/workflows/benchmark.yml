@@ -22,7 +22,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up GraalVM
-      uses: graalvm/setup-graalvm@v1.6.2
+      uses: graalvm/setup-graalvm@v1.6.8
       with:
         version: ${{ env.GRAALVM_VERSION }}
         distribution: 'graalvm'
@@ -107,7 +107,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up GraalVM
-      uses: graalvm/setup-graalvm@v1.6.2
+      uses: graalvm/setup-graalvm@v1.6.8
       with:
         version: ${{ env.GRAALVM_VERSION }}
         distribution: 'graalvm'
