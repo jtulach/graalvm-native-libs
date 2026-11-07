@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793959904609,
+  "lastUpdate": 1794043837860,
   "repoUrl": "https://github.com/jtulach/graalvm-native-libs",
   "entries": {
     "persist JMH": [
@@ -2478,6 +2478,76 @@ window.BENCHMARK_DATA = {
           {
             "name": "org.apidesign.bench.persist.PersistBenchmark.serializePoint",
             "value": 12466695.947885074,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "committer": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "id": "c8ddf458d4d8695e9f9bfc01cce7ca46f3720cd2",
+          "message": "Setting up GraalVM the most modern way",
+          "timestamp": "2026-11-05T11:08:55Z",
+          "url": "https://github.com/jtulach/graalvm-native-libs/commit/c8ddf458d4d8695e9f9bfc01cce7ca46f3720cd2"
+        },
+        "date": 1794043837456,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "org.apidesign.bench.persist.KryoComparisonBenchmark.deserializePoint",
+            "value": 18973642.33792427,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.KryoComparisonBenchmark.serializePoint",
+            "value": 22298093.344682638,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.ObjectStreamComparisonBenchmark.deserializePoint",
+            "value": 614075.4248974711,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.ObjectStreamComparisonBenchmark.serializePoint",
+            "value": 4002635.406888889,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.PersistBenchmark.deserializeLine",
+            "value": 22789703.280035514,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.PersistBenchmark.deserializePoint",
+            "value": 37565443.65199333,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.PersistBenchmark.serializeLine",
+            "value": 7891855.495549443,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.persist.PersistBenchmark.serializePoint",
+            "value": 15828248.446019866,
             "unit": "ops/s",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
