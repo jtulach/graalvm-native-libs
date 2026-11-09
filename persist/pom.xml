@@ -28,6 +28,16 @@
         <maven.compiler.release>25</maven.compiler.release>
         <repoDir>..</repoDir>
     </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
