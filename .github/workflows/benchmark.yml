@@ -106,6 +106,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: .github/pages/package-lock.json
+
+    - name: Build benchmark dashboard
+      working-directory: .github/pages
+      run: |
+        npm ci --no-audit --no-fund
+        npm run typecheck:node
+        npm run build:node
+
     - name: Set up GraalVM
       uses: graalvm/setup-graalvm@v1.6.8
       with:
@@ -170,13 +184,13 @@ jobs:
         comment-on-alert: true
         fail-on-alert: false
 
-    - name: Install grouped-charts index.html on gh-pages
+    - name: Install grouped-charts dashboard on gh-pages
       run: |
         git fetch origin gh-pages
         git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages --detach
         for d in channel-ratios interop-jmh persist-jmh; do
           mkdir -p "$RUNNER_TEMP/gh-pages/dev/bench/$d"
-          cp .github/pages/index.html "$RUNNER_TEMP/gh-pages/dev/bench/$d/index.html"
+          cp -R .github/pages/dist/. "$RUNNER_TEMP/gh-pages/dev/bench/$d/"
         done
         cd "$RUNNER_TEMP/gh-pages"
         if [ -n "$(git status --porcelain)" ]; then
