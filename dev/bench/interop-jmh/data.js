@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795433720260,
+  "lastUpdate": 1795525721504,
   "repoUrl": "https://github.com/jtulach/graalvm-native-libs",
   "entries": {
     "jvm-interop JMH": [
@@ -2530,6 +2530,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "org.apidesign.bench.interop.InteropBenchmark.localInvokeString",
             "value": 21706700.178432096,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jaroslav Tulach",
+            "username": "jtulach",
+            "email": "jaroslav.tulach@apidesign.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c9d06bf758f92776148aa9fd3a7d776c964a0a98",
+          "message": "#12: Vue.js app to display the graphs",
+          "timestamp": "2026-11-16T20:23:05Z",
+          "url": "https://github.com/jtulach/graalvm-native-libs/commit/c9d06bf758f92776148aa9fd3a7d776c964a0a98"
+        },
+        "date": 1795525721049,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.channelArrayAccess",
+            "value": 165406.11323900425,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.channelInvokeString",
+            "value": 558789.6788130483,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.localArrayAccess",
+            "value": 23948694.0215605,
+            "unit": "ops/s",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.apidesign.bench.interop.InteropBenchmark.localInvokeString",
+            "value": 41670983.168703645,
             "unit": "ops/s",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
